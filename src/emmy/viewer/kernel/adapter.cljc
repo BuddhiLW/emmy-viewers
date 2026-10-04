@@ -56,7 +56,7 @@
               ["fb.batch = function(xs, n, ps, out) {"
                (str "  out = out || new Float64Array(n * " m ");")
                (when (= convention :primitive)
-                 (str "  const row = new Float64Array(" d "), res = new Float64Array(" m ");"))
+                 (str "  const row = new Array(" d ").fill(0), res = new Array(" m ").fill(0);"))
                (str "  for (let i = 0; i < n; i++) {\n"
                     "    const r = i * " d ", col = i * " m ";\n"
                     body "\n  }")

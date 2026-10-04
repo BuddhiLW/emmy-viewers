@@ -341,17 +341,24 @@ an implementation of `KernelBackend`, not editing viewers or compile call sites.
 Measured with `clojure -J-Xmx2g -M:raster:bench` (node 22, JDK 25, ns per
 point; see `bench/results/latest.edn`). Each batch pass evaluates all points;
 `surface-64` is a complete 64×64 grid on [-3, 3]² with two parameters.
-Measurements vary by machine and run:
+These numbers come from a shared, busy machine, so single per-point timings
+vary by up to 2x between runs; the batch columns are the stable result:
 
 | function | `:js` per point | `:js` batch | `:raster` per point | `:raster` batch |
 |---|---:|---:|---:|---:|
-| `x sin x` | 21.1 | 10.3 | 22.0 | 5.5 |
-| degree-7 polynomial | 261.3 | 212.1 | 34.9 | 3.7 |
-| parametric curve, 2 outputs | 75.6 | 28.1 | 56.2 | 9.6 |
-| `a sin(bx) + x²`, 2 params | 69.4 | 26.7 | 30.8 | 6.1 |
-| MathBox surface, 3 outputs | 55.0 | 156.8 | 36.0 | 18.8 |
-| `surface-64`: `a sin(bx) cos(y)` | 85.4 | 48.0 | 43.3 | 10.0 |
-| double-pendulum state derivative | 88.3 | 147.4 | 51.6 | 27.8 |
+| `x sin x` | 67.0 | 16.5 | 62.1 | 6.5 |
+| degree-7 polynomial | 280.5 | 291.5 | 43.7 | 4.0 |
+| parametric curve, 2 outputs | 78.5 | 49.4 | 131.6 | 10.5 |
+| `a sin(bx) + x²`, 2 params | 51.1 | 28.9 | 26.3 | 6.1 |
+| MathBox surface, 3 outputs | 64.7 | 55.2 | 36.8 | 32.4 |
+| `surface-64`: `a sin(bx) cos(y)` | 99.3 | 46.5 | 51.9 | 12.7 |
+| double-pendulum state derivative | 89.8 | 80.3 | 63.4 | 35.0 |
+
+What holds across runs: `:raster` batch is the fastest path for every case
+(4 to 35 ns per point, 2x to 70x faster than `:js` per point), and a MathBox
+`surface-64` grid evaluates in one call at about 13 ns per point. `:js` batch
+is faster than, or within noise of, `:js` per point, so a viewer can batch
+through the contract whichever backend compiled its function.
 
 The raster backend needs raster on the classpath (the `:raster` alias). Things
 to know:
