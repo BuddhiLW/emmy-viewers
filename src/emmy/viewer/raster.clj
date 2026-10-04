@@ -33,7 +33,8 @@
             [raster.compiler.pipeline :as pl]
             [raster.core]
             [raster.math]
-            [raster.numeric])
+            [raster.numeric]
+            [emmy.viewer.kernel.backend :as backend])
   (:import (java.util Base64)))
 
 (def ^:private kernel-ns
@@ -79,17 +80,19 @@
 (defn- base64 [^bytes bs]
   (.encodeToString (Base64/getEncoder) bs))
 
-(defn compiled-fn
-  "The raster implementation of [[emmy.viewer.compile/compiled-fn]]: a form that
-  evaluates, in the browser, to the compiled function.
+(defrecord RasterBackend []
+  backend/KernelBackend
+  (kernel-form [_ f params initial-state opts]
+    (let [p        (plan/plan f params initial-state opts)
+          mod      (module p)
+          sync?    (<= (alength ^bytes mod) glue/sync-limit)
+          fallback (xc/compile-state-fn f params initial-state (assoc opts :mode :js))]
+      (list (list 'js/Function. "fb" (glue/glue p (base64 mod) sync?))
+            (list* 'js/Function. fallback)))))
 
-  Collect and promote ([[emmy.viewer.kernel.plan]]), pipeline
-  ([[emmy.viewer.raster.lower]], [[emmy.viewer.raster.glue]]) are pure; this is
-  the boundary, where the kernel is evaluated and compiled."
+(defn compiled-fn
+  "Return the raster kernel form through its KernelBackend implementation."
   [f params initial-state opts]
-  (let [p        (plan/plan f params initial-state opts)
-        mod      (module p)
-        sync?    (<= (alength ^bytes mod) glue/sync-limit)
-        fallback (xc/compile-state-fn f params initial-state (assoc opts :mode :js))]
-    (list (list 'js/Function. "fb" (glue/glue p (base64 mod) sync?))
-          (list* 'js/Function. fallback))))
+  (backend/kernel-form (->RasterBackend) f params initial-state opts))
+
+(backend/register-backend! :raster (->RasterBackend))
