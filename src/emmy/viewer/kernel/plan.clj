@@ -1,5 +1,5 @@
-(ns ^:no-doc emmy.viewer.raster.plan
-  "Pure layer of the raster backend, first stage: the algebra, by Emmy.
+(ns ^:no-doc emmy.viewer.kernel.plan
+  "Pure kernel plan: the algebra, by Emmy.
 
   A function is applied to symbolic arguments exactly as
   [[emmy.expression.compile/compile-state-fn]] would apply it, simplified, and
@@ -58,6 +58,7 @@
 
   - `:convention`: one of [[conventions]]
   - `:state`: the state symbols, flattened
+  - `:state-shape`: see [[shape]] for `initial-state`; `nil` for a scalar state
   - `:params`: the parameter symbols, empty when the parameters are not generic
   - `:outputs`: one frozen, simplified expression per output component
   - `:shape`: see [[shape]]; `nil` for a scalar output"
@@ -77,6 +78,7 @@
         out        (if simplify? (e/simplify out) out)]
     {:convention calling-convention
      :state      (leaves state)
+     :state-shape (shape initial-state)
      :params     (or param-syms [])
      :outputs    (mapv e/freeze (leaves out))
      :shape      (shape out)}))

@@ -9,7 +9,7 @@
             [emmy.viewer.compile :as vc]
             [emmy.viewer.raster.glue :as glue]
             [emmy.viewer.raster.lower :as lower]
-            [emmy.viewer.raster.plan :as plan]))
+            [emmy.viewer.kernel.plan :as plan]))
 
 (deftest lower-test
   (testing "integer powers become products, so a negative base stays defined"
@@ -50,6 +50,7 @@
                        {:calling-convention :native})]
       (is (= :native (:convention p)))
       (is (= '[s0] (:state p)))
+      (is (= [0] (:state-shape p)))
       (is (= [] (:params p)))
       (is (= '[(* s0 (sin s0))] (:outputs p)))
       (is (nil? (:shape p)))))
@@ -72,7 +73,12 @@
                        false (e/up 0 0 0)
                        {:calling-convention :primitive :generic-params? false})]
       (is (= '[s0 s1 s2] (:state p)))
-      (is (= '[1 s2 (* -2 s1)] (:outputs p))))))
+      (is (= '[1 s2 (* -2 s1)] (:outputs p)))))
+
+  (testing "a scalar initial state has no state shape"
+    (let [p (plan/plan identity false 0 {})]
+      (is (contains? p :state-shape))
+      (is (nil? (:state-shape p))))))
 
 (deftest shared-test
   (testing "a subexpression shared by two outputs is bound once"
