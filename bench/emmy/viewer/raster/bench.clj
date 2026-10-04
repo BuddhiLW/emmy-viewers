@@ -65,6 +65,11 @@
     :params false :init [0 0]
     :opts {:calling-convention :primitive :generic-params? false} :arity 2}
 
+   {:id :surface-64 :doc "MathBox 64x64 grid: a sin(bx) cos(y)"
+    :f (fn [a b] (fn [[x y]] (e/* a (e/sin (e/* b x)) (e/cos y))))
+    :params '[a b] :param-values [1.3 2.1] :init [0 0]
+    :opts {:calling-convention :structure} :arity 2 :grid-width 64}
+
    {:id :double-pendulum :doc "physics evolve: double-pendulum state derivative, 5 params"
     :f (fn [m1 m2 l1 l2 g]
          (fn [[s]] ((l/Lagrangian->state-derivative (L-double-pendulum m1 m2 l1 l2 g)) s)))
@@ -77,6 +82,14 @@
   [arity n seed]
   (let [rng (Random. seed)]
     (vec (repeatedly n (fn [] (vec (repeatedly arity #(- (* 6.0 (.nextDouble rng)) 3.0))))))))
+
+(defn grid-inputs
+  "A full `width` by `width` MathBox grid on [-3, 3] in row-major order."
+  [width]
+  (vec (for [j (range width)
+             i (range width)]
+         [(+ -3.0 (* 6.0 (/ i (dec width))))
+          (+ -3.0 (* 6.0 (/ j (dec width))))])))
 
 ;; ## Stats
 
@@ -116,13 +129,15 @@
   (let [p        (plan/plan f params init opts)
         js-form  (binding [vc/*backend* :js] (vc/compiled-fn f params init opts))
         r-form   (binding [vc/*backend* :raster] (vc/compiled-fn f params init opts))
+        [[_ _ adapter] [_ & js-fb]] js-form
         [[_ _ glue] [_ & fb]] r-form
         mod      (raster/module p)]
     {:node    {:id (name id)
                :convention (name (:convention p))
                :nOut (count (:outputs p))
-               :jsArgs (vec (butlast fb))
-               :jsBody (last fb)
+               :jsArgs (vec (butlast js-fb))
+               :jsBody (last js-fb)
+               :adapter adapter
                :glue glue
                :params (vec (or param-values []))
                :inputs xs}
@@ -148,17 +163,15 @@
 
 (defn table-rows [results]
   (for [{:keys [id build payload runtime max-abs-diff]} results
-        :let [{:keys [js raster batch]} (:variants runtime)
-              speedup (fn [v] (format "%.2fx" (/ (:median js) (:median v))))]]
-    {"case"               (name id)
-     "js ns/pt"           (fmt (:median js))
-     "raster ns/pt"       (fmt (:median raster))
-     "batch ns/pt"        (fmt (:median batch))
-     "speedup per-point"  (speedup raster)
-     "speedup batch"      (speedup batch)
-     "build js/raster ms" (str (fmt (:js-ms build)) " / " (fmt (:raster-ms build)))
-     "payload js/raster"  (str (:js-chars payload) " / " (:raster-chars payload))
-     "max |raster-js|"    (format "%.1e" (double max-abs-diff))}))
+        :let [{:keys [js js-batch raster raster-batch]} (:variants runtime)]]
+    {"case"                (name id)
+     "js ns/pt"            (fmt (:median js))
+     "js batch ns/pt"      (fmt (:median js-batch))
+     "raster ns/pt"        (fmt (:median raster))
+     "raster batch ns/pt"  (fmt (:median raster-batch))
+     "build js/raster ms"  (str (fmt (:js-ms build)) " / " (fmt (:raster-ms build)))
+     "payload js/raster"   (str (:js-chars payload) " / " (:raster-chars payload))
+     "max |raster-js|"     (format "%.1e" (double max-abs-diff))}))
 
 (defn run
   "Runs every case; returns the results."
@@ -166,7 +179,9 @@
   ;; Warm the JVM side once, so the first case does not pay class loading.
   (build-costs (first cases) 1)
   (let [prepared (mapv (fn [c]
-                         (let [xs (inputs (:arity c) n-inputs 42)]
+                         (let [xs (if-let [width (:grid-width c)]
+                                    (grid-inputs width)
+                                    (inputs (:arity c) n-inputs 42))]
                            (merge (node-case c xs)
                                   {:id (:id c) :doc (:doc c)
                                    :build (build-costs c build-reps)})))
