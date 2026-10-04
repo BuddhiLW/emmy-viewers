@@ -11,81 +11,145 @@
   fallback until it is ready."
   4096)
 
+(def layout
+  "Where the glue keeps a call's data in the module's memory, as byte offsets.
+  raster's modules export 16 MiB of memory and use none of it themselves (no
+  data segments, no stack), so the glue owns all of it: parameters first,
+  then the inputs, then the outputs."
+  {:params 0
+   :inputs 4096
+   :outputs 8388608
+   :end 16777216})
+
+(defn- f64-index
+  "The Float64Array index of byte offset `k` of [[layout]]."
+  [k]
+  (quot (layout k) 8))
+
 (defn- js-out
-  "The JS expression of an output of shape `shape`, calling the kernels with
-  `args` (a JS argument list as a string)."
-  [shape args]
+  "The JS expression of an output of shape `shape`, read from the output row
+  that starts at Float64Array index `base`."
+  [shape base]
   (cond
-    (nil? shape)    (str "ks[0](" args ")")
-    (vector? shape) (str "[" (str/join ", " (map #(js-out % args) shape)) "]")
-    :else           (str "ks[" shape "](" args ")")))
+    (nil? shape)    (str "F[" base "]")
+    (vector? shape) (str "[" (str/join ", " (map #(js-out % base) shape)) "]")
+    :else           (str "F[" (+ base shape) "]")))
 
 (def ^:private prelude
+  "Shared JS: decoding, the kernel `k` and its memory view `F` (null until
+  loaded), parameter caching and input writing."
   (str/join
    "\n"
-   ["const flat = (x, out) => {"
-    "  if (typeof x === \"number\") { out.push(x); }"
-    "  else if (x != null) { for (const v of x) flat(v, out); }"
-    "  return out;"
+   ["const bytes = (b) => Uint8Array.from(atob(b), (c) => c.charCodeAt(0));"
+    "let k = null, F = null, lastPs = undefined;"
+    "const use = (inst) => { k = inst.exports.k; F = new Float64Array(inst.exports.memory.buffer); };"
+    ;; Parameters change only when a slider moves, and the caller then passes a
+    ;; new object, so an identical object is never rewritten.
+    "const setPs = (ps) => {"
+    "  if (ps === lastPs) return;"
+    "  lastPs = ps;"
+    "  if (ps == null) return;"
+    (str "  let j = " (f64-index :params) ";")
+    "  if (Array.isArray(ps) || ArrayBuffer.isView(ps)) { for (let i = 0; i < ps.length; i++) F[j++] = ps[i]; }"
+    "  else { for (const v of ps) F[j++] = v; }"
     "};"
-    "const bytes = (b) => Uint8Array.from(atob(b), (c) => c.charCodeAt(0));"
-    "const load = (m) => new WebAssembly.Instance(m, {}).exports.k;"
-    "let ks = null;"]))
+    ;; Writes one point's state, flattening nested structures, from index j.
+    "const put = (x, j) => {"
+    "  if (typeof x === \"number\") { F[j] = x; return j + 1; }"
+    "  if (Array.isArray(x) || ArrayBuffer.isView(x)) {"
+    "    for (let i = 0; i < x.length; i++) j = typeof x[i] === \"number\" ? (F[j] = x[i], j + 1) : put(x[i], j);"
+    "    return j;"
+    "  }"
+    "  for (const v of x) j = put(v, j);"
+    "  return j;"
+    "};"]))
 
 (defn- loader
-  "JS that fills `ks` with the kernels of `modules` (base64 strings),
-  synchronously when `sync?`."
-  [modules sync?]
-  (let [srcs (str "[" (str/join ", " (map pr-str modules)) "]")]
-    (str "if (typeof WebAssembly !== \"undefined\") {\n"
-         (if sync?
-           (str "  try { ks = " srcs ".map((b) => load(new WebAssembly.Module(bytes(b)))); }\n"
-                "  catch (e) { ks = null; }\n")
-           (str "  Promise.all(" srcs ".map((b) => WebAssembly.compile(bytes(b))))\n"
-                "    .then((ms) => { ks = ms.map(load); })\n"
-                "    .catch(() => { ks = null; });\n"))
-         "}")))
+  "JS that instantiates `module` (base64), synchronously when `sync?`."
+  [module sync?]
+  (str "if (typeof WebAssembly !== \"undefined\") {\n"
+       (if sync?
+         (str "  try { use(new WebAssembly.Instance(new WebAssembly.Module(bytes(" (pr-str module) ")), {})); }\n"
+              "  catch (e) { k = null; }\n")
+         (str "  WebAssembly.instantiate(bytes(" (pr-str module) "), {})\n"
+              "    .then((r) => use(r.instance))\n"
+              "    .catch(() => { k = null; });\n"))
+       "}"))
 
 (defn- function-source
-  "The JS function that calls the kernels in `plan`'s calling convention, and
-  `fb` while they are not loaded. Kernels take the flattened state, then the
-  flattened parameters."
+  "The JS function that calls the kernel for one point in `plan`'s calling
+  convention, and `fb` while the kernel is not loaded. It allocates nothing
+  except a :native or :structure function's vector result."
   [{:keys [convention state params outputs shape]}]
-  (let [inputs (fn [state-arg]
-                 (str "  const a = flat(" state-arg ", [])"
-                      (when (seq params) ".concat(flat(ps, []))")
-                      ";\n"))]
+  (let [x0   (f64-index :inputs)
+        o0   (f64-index :outputs)
+        call (str "  k(" (layout :inputs) ", " (layout :outputs) ", " (layout :params) ", 1);\n")
+        ps   (when (seq params) "  setPs(ps);\n")]
     (case convention
       :native
       (let [xs (str/join ", " state)]
         (str "const f = function(" xs ") {\n"
-             "  if (ks === null) return fb(" xs ");\n"
-             "  return " (js-out shape xs) ";\n"
+             "  if (k === null) return fb(" xs ");\n"
+             (str/join (map-indexed (fn [j s] (str "  F[" (+ x0 j) "] = " s ";\n")) state))
+             call
+             "  return " (js-out shape o0) ";\n"
              "};"))
 
       :structure
       (str "const f = function(state, ps) {\n"
-           "  if (ks === null) return fb(state, ps);\n"
-           (inputs "state")
-           "  return " (js-out shape "...a") ";\n"
+           "  if (k === null) return fb(state, ps);\n"
+           ps
+           "  put(state, " x0 ");\n"
+           call
+           "  return " (js-out shape o0) ";\n"
            "};")
 
       :primitive
       (str "const f = function(ys, yps, ps) {\n"
-           "  if (ks === null) return fb(ys, yps, ps);\n"
-           (inputs "ys")
-           (str/join (map (fn [i] (str "  yps[" i "] = ks[" i "](...a);\n"))
-                          (range (count outputs))))
+           "  if (k === null) return fb(ys, yps, ps);\n"
+           ps
+           (str/join (map (fn [j] (str "  F[" (+ x0 j) "] = ys[" j "];\n")) (range (count state))))
+           call
+           (str/join (map (fn [j] (str "  yps[" j "] = F[" (+ o0 j) "];\n")) (range (count outputs))))
            "};"))))
+
+(defn- batch-source
+  "JS for `f.batch(xs, n, ps, out)`: evaluates `n` points in one kernel call
+  per chunk. `xs` holds the points' flattened states row-major (an array or
+  typed array of n * d numbers), `ps` the parameters (ignored without), `out`
+  an optional Float64Array of n * m to fill. Returns the outputs, row-major;
+  null while the kernel is not loaded."
+  [{:keys [state outputs]}]
+  (let [d (count state)
+        m (count outputs)]
+    (str "f.batch = function(xs, n, ps, out) {\n"
+         "  if (k === null) return null;\n"
+         "  setPs(ps);\n"
+         "  out = out || new Float64Array(n * " m ");\n"
+         "  const cap = Math.floor(Math.min("
+         (- (layout :outputs) (layout :inputs)) " / " (* 8 d) ", "
+         (- (layout :end) (layout :outputs)) " / " (* 8 m) "));\n"
+         "  const typed = ArrayBuffer.isView(xs);\n"
+         "  for (let s = 0; s < n; s += cap) {\n"
+         "    const c = Math.min(cap, n - s);\n"
+         "    const rows = typed ? xs.subarray(s * " d ", (s + c) * " d ") : xs.slice(s * " d ", (s + c) * " d ");\n"
+         "    F.set(rows, " (f64-index :inputs) ");\n"
+         "    k(" (layout :inputs) ", " (layout :outputs) ", " (layout :params) ", c);\n"
+         "    out.set(F.subarray(" (f64-index :outputs) ", " (f64-index :outputs) " + c * " m "), s * " m ");\n"
+         "  }\n"
+         "  return out;\n"
+         "};")))
 
 (defn glue
   "The source of a JS function of one argument, `fb` (the same function compiled
-  by Emmy's `:js` mode), that loads `modules` (base64 wasm, one per output of
-  `plan`) and returns a function in `plan`'s calling convention. The returned
-  function answers `wasm()` with whether the kernels are loaded."
-  [plan modules sync?]
+  by Emmy's `:js` mode), that loads `module` (the plan's kernel, base64 wasm)
+  and returns a function in `plan`'s calling convention. The returned function
+  answers `wasm()` with whether the kernel is loaded, and `batch(...)` evaluates
+  many points in one kernel call (see [[batch-source]])."
+  [plan module sync?]
   (str/join "\n" [prelude
-                  (loader modules sync?)
+                  (loader module sync?)
                   (function-source plan)
-                  "f.wasm = () => ks !== null;"
+                  (batch-source plan)
+                  "f.wasm = () => k !== null;"
                   "return f;"]))

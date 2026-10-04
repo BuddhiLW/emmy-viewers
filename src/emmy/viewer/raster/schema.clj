@@ -63,9 +63,9 @@
 
 (m/=> emmy.viewer.raster.lower/lower [:=> [:cat [:sequential :symbol] Expr] Expr])
 
-(m/=> emmy.viewer.raster.lower/kernel-forms [:=> [:cat Plan ifn?] [:vector KernelForm]])
+(m/=> emmy.viewer.raster.lower/kernel-form [:=> [:cat :symbol Plan] KernelForm])
 
-(m/=> emmy.viewer.raster.glue/glue [:=> [:cat Plan [:vector Module] :boolean] :string])
+(m/=> emmy.viewer.raster.glue/glue [:=> [:cat Plan Module :boolean] :string])
 
 (def ^:private nses
   '#{emmy.viewer.raster.plan emmy.viewer.raster.lower emmy.viewer.raster.glue})

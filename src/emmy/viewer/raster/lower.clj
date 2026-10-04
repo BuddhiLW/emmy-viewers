@@ -5,7 +5,9 @@
   parameters, and return a `Double`.
 
   Nothing here evaluates a form; [[emmy.viewer.raster]] defines and compiles the
-  kernels.")
+  kernels."
+  (:require [clojure.walk :as walk]
+            [emmy.expression.cse :as cse]))
 
 (def ^:private raster-fns
   "Emmy operators raster provides directly. `sqrt` and `abs` are JVM intrinsics
@@ -95,19 +97,66 @@
                 (lower-node args x)))]
       (go expr))))
 
-(defn kernel-form
-  "The `raster.core/deftm` source of a scalar kernel named `kname` over `args`."
-  [kname args body]
-  (list 'raster.core/deftm kname
-        (into [] (mapcat (fn [a] [a :- 'Double])) args)
-        :- 'Double
-        body))
+(defn- constant?
+  "True for a number, or an application whose arguments are all constant."
+  [x]
+  (or (number? x)
+      (and (seq? x) (every? constant? (rest x)))))
 
-(defn kernel-forms
-  "One kernel source per output of `plan`, named by `kname-fn` of its index."
-  [{:keys [state params outputs]} kname-fn]
-  (let [args (into (vec state) params)]
-    (vec
-     (map-indexed (fn [i out]
-                    (kernel-form (kname-fn i) args (lower args out)))
-                  outputs))))
+(defn shared
+  "`outputs` with the subexpressions they share bound once, by Emmy's CSE pass
+  over all outputs together: `{:bindings [[sym expr] ...] :outputs [expr ...]}`.
+  Constant bindings are substituted back, so a literal exponent stays a
+  literal (see `power`)."
+  [outputs]
+  (cse/extract-common-subexpressions
+   (list* 'clojure.core/doto 'out
+          (map-indexed (fn [i o] (list 'clojure.core/aset i o)) outputs))
+   (fn [[_doto _out & asets] pairs]
+     (let [consts (into {} (filter (comp constant? second)) pairs)
+           subst  #(walk/postwalk-replace consts %)]
+       {:bindings (vec (for [[sym v] pairs :when (not (consts sym))]
+                         [sym (subst v)]))
+        :outputs  (mapv (fn [[_aset _i e]] (subst e)) asets)}))
+   {}))
+
+(defn kernel-form
+  "The `raster.core/deftm` source of `plan`'s kernel, named `kname`:
+
+      (kname xs out ps n) -> n
+
+  For each of `n` points it reads the point's state from `xs` (row-major, one
+  row per point), computes every output once, sharing common subexpressions,
+  and writes them to `out` (one row per point). Parameters are read from `ps`
+  once, before the loop. `xs`, `out` and `ps` are f64 arrays; in wasm they are
+  byte offsets into the module's memory.
+
+  Index arithmetic stays `Long` and every value `Double`: raster's wasm backend
+  has no `Long * Double`."
+  [kname {:keys [state params outputs]}]
+  (let [{:keys [bindings] outs :outputs} (shared outputs)
+        d       (count state)
+        m       (count outs)
+        known   (into (set state) params)
+        [lowered _] (reduce (fn [[acc known] [sym v]]
+                              [(conj acc [sym (lower known v)]) (conj known sym)])
+                            [[] known]
+                            bindings)
+        known   (into known (map first bindings))]
+    (list 'raster.core/deftm kname
+          '[xs :- (Array double) out :- (Array double)
+            ps :- (Array double) n :- Long]
+          :- 'Long
+          (list 'let (into [] (mapcat (fn [j p] [p (list 'aget 'ps j)]) (range) params))
+                (list 'loop '[i 0]
+                      (list 'if '(< i n)
+                            (concat
+                             (list 'let (into ['row (list '* 'i d) 'col (list '* 'i m)]
+                                              (concat
+                                               (mapcat (fn [j s] [s (list 'aget 'xs (list '+ 'row j))])
+                                                       (range) state)
+                                               (mapcat identity lowered))))
+                             (map-indexed (fn [j o] (list 'aset 'out (list '+ 'col j) (lower known o)))
+                                          outs)
+                             ['(recur (+ i 1))])
+                            'n))))))

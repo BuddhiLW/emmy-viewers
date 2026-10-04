@@ -70,10 +70,11 @@
               (swap! cache assoc key bs)
               bs))))))
 
-(defn modules
-  "The wasm modules, one per output of `plan`, as byte arrays."
+(defn module
+  "`plan`'s kernel (see [[emmy.viewer.raster.lower/kernel-form]]) as a wasm
+  module, a byte array."
   [plan]
-  (mapv wasm-bytes (lower/kernel-forms plan (fn [_] (gensym "kernel")))))
+  (wasm-bytes (lower/kernel-form (gensym "kernel") plan)))
 
 (defn- base64 [^bytes bs]
   (.encodeToString (Base64/getEncoder) bs))
@@ -84,11 +85,11 @@
 
   Collect and promote ([[emmy.viewer.raster.plan]]), pipeline
   ([[emmy.viewer.raster.lower]], [[emmy.viewer.raster.glue]]) are pure; this is
-  the boundary, where kernels are evaluated and compiled."
+  the boundary, where the kernel is evaluated and compiled."
   [f params initial-state opts]
   (let [p        (plan/plan f params initial-state opts)
-        mods     (modules p)
-        sync?    (every? #(<= (alength ^bytes %) glue/sync-limit) mods)
+        mod      (module p)
+        sync?    (<= (alength ^bytes mod) glue/sync-limit)
         fallback (xc/compile-state-fn f params initial-state (assoc opts :mode :js))]
-    (list (list 'js/Function. "fb" (glue/glue p (mapv base64 mods) sync?))
+    (list (list 'js/Function. "fb" (glue/glue p (base64 mod) sync?))
           (list* 'js/Function. fallback))))

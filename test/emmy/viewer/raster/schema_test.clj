@@ -60,11 +60,11 @@
     (try
       (doseq [[f params init opts] cases
               :let [p (plan/plan f params init opts)]]
-        (is (vector? (lower/kernel-forms p (fn [i] (symbol (str "k" i))))))
-        (is (string? (glue/glue p (vec (repeat (count (:outputs p)) "AA==")) true))))
+        (is (seq? (lower/kernel-form 'k0 p)))
+        (is (string? (glue/glue p "AA==" true))))
       (testing "a call outside the contract is refused"
         (is (thrown? clojure.lang.ExceptionInfo
-                     (glue/glue {:convention :nope} [] true))))
+                     (glue/glue {:convention :nope} "AA==" true))))
       (finally
         ((sv 'emmy.viewer.raster.schema/unstrument!))))))
 
@@ -74,5 +74,5 @@
           plan-s   (sv 'emmy.viewer.raster.schema/Plan)]
       (dotimes [seed 50]
         (let [p   (generate plan-s {:seed seed :size 6})
-              src (glue/glue p (vec (repeat (count (:outputs p)) "AA==")) (even? seed))]
+              src (glue/glue p "AA==" (even? seed))]
           (is (str/ends-with? src "return f;") (pr-str p)))))))

@@ -74,28 +74,53 @@
       (is (= '[s0 s1 s2] (:state p)))
       (is (= '[1 s2 (* -2 s1)] (:outputs p))))))
 
-(deftest kernel-forms-test
-  (let [p (plan/plan (fn [a] (fn [[x]] (e/* a (e/expt x 2)))) '[a] [0] {})]
-    (is (= '[(raster.core/deftm k0 [s0 :- Double p0 :- Double] :- Double
-               (* p0 (* s0 s0)))]
-           (lower/kernel-forms p (fn [i] (symbol (str "k" i))))))))
+(deftest shared-test
+  (testing "a subexpression shared by two outputs is bound once"
+    (let [{:keys [bindings outputs]} (lower/shared '[(sin (* a x)) (cos (* a x))])]
+      (is (= 1 (count bindings)))
+      (is (= '(* a x) (second (first bindings))))
+      (is (= (list 'sin (ffirst bindings)) (first outputs)))))
+  (testing "constant bindings are substituted back, so exponents stay literal"
+    (let [{:keys [bindings outputs]} (lower/shared '[(* (/ -1 4) (expt x 2)) (* (/ -1 4) (expt y 2))])]
+      (is (empty? bindings))
+      (is (= '(* (/ -1 4) (expt x 2)) (first outputs))))))
+
+(deftest kernel-form-test
+  (let [p    (plan/plan (fn [a] (fn [[x]] (e/up x (e/* a (e/expt x 2))))) '[a] [0] {})
+        form (lower/kernel-form 'k0 p)]
+    (testing "one batch kernel over (xs out ps n), returning n"
+      (is (= '(raster.core/deftm k0
+                [xs :- (Array double) out :- (Array double) ps :- (Array double) n :- Long]
+                :- Long)
+             (take 5 form))))
+    (testing "params are read once, outside the point loop"
+      (is (= '(let [p0 (aget ps 0)]) (take 2 (nth form 5)))))
+    (testing "every output is written for each point, lowered"
+      (let [body (pr-str form)]
+        (is (re-find #"\(aset out \(\+ col 0\) s0\)" body))
+        (is (re-find #"\(aset out \(\+ col 1\) \(\* p0 \(\* s0 s0\)\)\)" body))))))
 
 (deftest glue-test
   (let [p {:convention :primitive :state '[s0 s1] :params '[p0]
            :outputs '[a b c] :shape [0 1 2]}]
     (testing "small modules load synchronously, large ones asynchronously"
-      (is (str/includes? (glue/glue p ["AA=="] true) "new WebAssembly.Module"))
-      (is (str/includes? (glue/glue p ["AA=="] false) "WebAssembly.compile")))
-    (testing "a :primitive function writes one slot per output"
-      (let [src (glue/glue p ["AA==" "AA==" "AA=="] true)]
-        (is (str/includes? src "yps[2] = ks[2](...a);"))
-        (is (str/includes? src ".concat(flat(ps, []))")))))
-  (testing "a native function takes its arguments positionally"
+      (is (str/includes? (glue/glue p "AA==" true) "new WebAssembly.Module"))
+      (is (str/includes? (glue/glue p "AA==" false) "WebAssembly.instantiate")))
+    (testing "a :primitive function writes inputs into memory and outputs back, one kernel call"
+      (let [src (glue/glue p "AA==" true)]
+        (is (str/includes? src "F[513] = ys[1];"))
+        (is (str/includes? src "k(4096, 8388608, 0, 1);"))
+        (is (str/includes? src "yps[2] = F[1048578];"))
+        (is (str/includes? src "setPs(ps);"))
+        (is (str/includes? src "f.batch = function(xs, n, ps, out)")))))
+  (testing "a native function takes its arguments positionally and allocates only its result"
     (let [src (glue/glue {:convention :native :state '[s0] :params []
                           :outputs '[a b] :shape [0 1]}
-                         ["AA==" "AA=="] true)]
+                         "AA==" true)]
       (is (str/includes? src "function(s0)"))
-      (is (str/includes? src "return [ks[0](s0), ks[1](s0)];")))))
+      (is (str/includes? src "F[512] = s0;"))
+      (is (str/includes? src "return [F[1048576], F[1048577]];"))
+      (is (str/includes? src "const f = function(s0) {\n  if (k === null) return fb(s0);\n  F[512] = s0;\n  k(4096, 8388608, 0, 1);")))))
 
 (deftest backend-test
   (let [f (fn [x] (e/* x (e/sin x)))]

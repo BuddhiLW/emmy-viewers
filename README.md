@@ -303,10 +303,12 @@ browser. The backend that compiles it is chosen by
 `emmy.viewer.compile/*backend*`:
 
 - `:js` (the default) emits JavaScript source through Emmy's `:js` compile mode.
-- `:raster` compiles each output of the function to an import-free WebAssembly
-  module with [raster](https://github.com/replikativ/raster). Emmy still
-  simplifies the function symbolically first; the modules ship inside the
-  fragment and keep the `:js` calling convention, so no viewer changes.
+- `:raster` compiles the function to one import-free WebAssembly module with
+  [raster](https://github.com/replikativ/raster). Emmy still simplifies the
+  function symbolically and shares common subexpressions across its outputs;
+  raster compiles the result into a kernel that evaluates every output of many
+  points in one call. The module ships inside the fragment and keeps the `:js`
+  calling convention, so no viewer changes.
 
 ```clojure
 (require '[emmy.viewer.compile :as vc])
@@ -315,8 +317,28 @@ browser. The backend that compiles it is chosen by
   (emmy.mafs/of-x (fn [x] (* x (sin x)))))
 ```
 
+Besides the usual per-point call, a raster-compiled function has
+`f.batch(xs, n, ps, out)`, which evaluates `n` points (their flattened states,
+row-major in `xs`) in a single WebAssembly call and returns a `Float64Array` of
+the outputs.
+
+Measured with `clojure -M:raster:bench` (node 22, JDK 25, ns per point; see
+`bench/`):
+
+| function | `:js` | `:raster` per point | `:raster` batch |
+|---|---|---|---|
+| `x sin x` | 25.5 | 22.3 (1.1x) | 5.7 (4.5x) |
+| degree-7 polynomial | 259.6 | 35.5 (7.3x) | 4.0 (64x) |
+| parametric curve, 2 outputs | 70.2 | 53.5 (1.3x) | 9.7 (7.2x) |
+| `a sin(bx) + x^2`, 2 params | 44.1 | 26.1 (1.7x) | 6.5 (6.7x) |
+| MathBox surface, 3 outputs | 58.4 | 43.8 (1.3x) | 25.6 (2.3x) |
+| double-pendulum state derivative | 76.3 | 54.5 (1.4x) | 27.9 (2.7x) |
+
 The raster backend needs raster on the classpath (the `:raster` alias). Things
 to know:
+
+- Compiling is slower: 0.1 to 0.5 s per function on the JVM, against a few ms
+  for `:js`, and the fragment is 2 to 4 KB larger.
 
 - raster's wasm math approximates the transcendental functions: `sin`/`cos`
   within 5e-6 and `atan`/`asin`/`acos` within 3e-5 of `java.lang.Math`. Plots
@@ -332,7 +354,10 @@ to know:
   is evaluated or compiled.
 - Each fragment also carries the `:js` function. A browser without WebAssembly
   uses it, and so does any call made while a module larger than 4 KB is still
-  compiling asynchronously.
+  compiling asynchronously (`f.batch` returns null then).
+- Parameters are written to the module only when the caller passes a new
+  parameter object, which is what the viewers do when a slider moves. Mutating
+  the same array in place between calls is not seen.
 
 ## Demos
 
