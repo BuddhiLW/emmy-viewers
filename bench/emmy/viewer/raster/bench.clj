@@ -23,7 +23,7 @@
             [emmy.viewer.compile :as vc]
             [emmy.viewer.raster :as raster]
             [emmy.viewer.raster.lower :as lower]
-            [emmy.viewer.raster.plan :as plan])
+            [emmy.viewer.kernel.plan :as plan])
   (:import (java.util Random)))
 
 ;; ## Cases

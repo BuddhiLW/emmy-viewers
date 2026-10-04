@@ -12,7 +12,7 @@
             [emmy.env :as e]
             [emmy.mechanics.lagrange :as l]
             [emmy.viewer.compile :as vc]
-            [emmy.viewer.raster.plan :as plan]))
+            [emmy.viewer.kernel.plan :as plan]))
 
 (defn- skip!
   "Reports a missing prerequisite. A skip, unless EMMY_VIEWERS_REQUIRE_RASTER

@@ -18,7 +18,7 @@
     (emmy.mafs/of-x (fn [x] (* x (sin x)))))
   ```
 
-  Layers: [[emmy.viewer.raster.plan]] (the algebra), [[emmy.viewer.raster.lower]]
+  Layers: [[emmy.viewer.kernel.plan]] (the algebra), [[emmy.viewer.raster.lower]]
   (raster's vocabulary) and [[emmy.viewer.raster.glue]] (the JS) are pure; their
   contracts live in [[emmy.viewer.raster.schema]]. This namespace is the
   boundary: the only place a kernel is evaluated or compiled.
@@ -29,7 +29,7 @@
   (:require [emmy.expression.compile :as xc]
             [emmy.viewer.raster.glue :as glue]
             [emmy.viewer.raster.lower :as lower]
-            [emmy.viewer.raster.plan :as plan]
+            [emmy.viewer.kernel.plan :as plan]
             [raster.compiler.pipeline :as pl]
             [raster.core]
             [raster.math]
@@ -83,7 +83,7 @@
   "The raster implementation of [[emmy.viewer.compile/compiled-fn]]: a form that
   evaluates, in the browser, to the compiled function.
 
-  Collect and promote ([[emmy.viewer.raster.plan]]), pipeline
+  Collect and promote ([[emmy.viewer.kernel.plan]]), pipeline
   ([[emmy.viewer.raster.lower]], [[emmy.viewer.raster.glue]]) are pure; this is
   the boundary, where the kernel is evaluated and compiled."
   [f params initial-state opts]

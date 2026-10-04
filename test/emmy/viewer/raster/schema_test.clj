@@ -7,7 +7,7 @@
             [emmy.env :as e]
             [emmy.viewer.raster.glue :as glue]
             [emmy.viewer.raster.lower :as lower]
-            [emmy.viewer.raster.plan :as plan]))
+            [emmy.viewer.kernel.plan :as plan]))
 
 (def ^:private malli?
   (try (require 'emmy.viewer.raster.schema 'malli.core 'malli.generator)

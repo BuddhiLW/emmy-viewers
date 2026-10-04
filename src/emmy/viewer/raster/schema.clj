@@ -10,7 +10,7 @@
   carries its own local `:registry`."
   (:require [emmy.viewer.raster.glue :as glue]
             [emmy.viewer.raster.lower :as lower]
-            [emmy.viewer.raster.plan :as plan]
+            [emmy.viewer.kernel.plan :as plan]
             [malli.core :as m]
             [malli.instrument :as mi]))
 
@@ -38,6 +38,7 @@
   [:map {:closed true}
    [:convention Convention]
    [:state [:vector :symbol]]
+   [:state-shape Shape]
    [:params [:vector :symbol]]
    [:outputs [:vector Expr]]
    [:shape Shape]])
@@ -59,7 +60,7 @@
   "A wasm module as base64."
   :string)
 
-(m/=> emmy.viewer.raster.plan/plan [:=> [:cat ifn? [:or false? [:sequential :any]] :any CompileOpts] Plan])
+(m/=> emmy.viewer.kernel.plan/plan [:=> [:cat ifn? [:or false? [:sequential :any]] :any CompileOpts] Plan])
 
 (m/=> emmy.viewer.raster.lower/lower [:=> [:cat [:sequential :symbol] Expr] Expr])
 
@@ -68,7 +69,7 @@
 (m/=> emmy.viewer.raster.glue/glue [:=> [:cat Plan Module :boolean] :string])
 
 (def ^:private nses
-  '#{emmy.viewer.raster.plan emmy.viewer.raster.lower emmy.viewer.raster.glue})
+  '#{emmy.viewer.kernel.plan emmy.viewer.raster.lower emmy.viewer.raster.glue})
 
 (defn instrument!
   "Checks every call to the raster backend's domain functions against its
