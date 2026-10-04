@@ -47,10 +47,10 @@
   (is (= [1 10 4 10 1 20 4 20 1 30 4 30]
          (vec (array-seq
                (kernel/grid-points [1 4] [10 30] 2 3 vector)))))
-  (is (= [2 9 2 9]
+  (is (= [2 9 2 12]
          (vec (array-seq
                (kernel/grid-points [2 8] [9 12] 1 2 vector)))))
-  (is (= [10 1 20 1 10 4 20 4]
+  (is (= [10 1 10 4 20 1 20 4]
          (vec (array-seq
                (kernel/grid-points [1 4] [10 20] 2 2
                                    (fn [x y] [y x])))))))

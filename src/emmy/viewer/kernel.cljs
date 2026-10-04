@@ -37,6 +37,43 @@
   [k xs n ps out]
   ((.-batch ^js k) xs n ps out))
 
+(defn grid-points
+  "Return flattened two-coordinate kernel inputs in MathBox Area's row-major order.
+  With no centering or padding, each axis includes both endpoints; a singleton
+  axis samples its lower endpoint."
+  [[a b] [c d] w h point-fn]
+  (let [xs (js/Float64Array. (* 2 w h))
+        dx (/ (- b a) (max 1 (dec w)))
+        dy (/ (- d c) (max 1 (dec h)))]
+    (dotimes [j h]
+      (dotimes [i w]
+        (let [[u v] (point-fn (+ a (* i dx)) (+ c (* j dy)))
+              idx (* 2 (+ i (* j w)))]
+          (aset xs idx u)
+          (aset xs (inc idx) v))))
+    xs))
+
+(defn batched-area-expr
+  "Adapt a scalar-output kernel to MathBox Area's (emit x y i j t) traversal.
+  MathBox starts each update at (0,0), then visits each row in i-major order.
+  Sample one complete grid per update when ready; otherwise use the per-point
+  callable kernel until the next update."
+  [k ps {:keys [x-range y-range width height input emit]}]
+  (let [xs (grid-points x-range y-range width height input)
+        n (* width height)
+        out (js/Float64Array. n)
+        values (volatile! out)
+        batched? (volatile! false)]
+    (fn [emit-point x y i j _time]
+      (when (and (zero? i) (zero? j))
+        (vreset! batched? (ready? k))
+        (when @batched?
+          (vreset! values (batch! k xs n ps out))))
+      (emit emit-point x y
+            (if @batched?
+              (aget @values (+ i (* j width)))
+              (k (input x y) ps))))))
+
 (defn- forward-contract!
   "Gives `g`, a per-point function derived from kernel `k` with parameters `ps`
   fixed, the rest of `k`'s contract. The property names are those JS reads, so
