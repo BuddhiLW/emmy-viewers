@@ -14,19 +14,27 @@
             [emmy.viewer.compile :as vc]
             [emmy.viewer.raster.plan :as plan]))
 
+(defn- skip!
+  "Reports a missing prerequisite. A skip, unless EMMY_VIEWERS_REQUIRE_RASTER
+  is set (the raster CI job), where a skipped suite would read as green."
+  [msg]
+  (if (System/getenv "EMMY_VIEWERS_REQUIRE_RASTER")
+    (throw (ex-info (str msg " (EMMY_VIEWERS_REQUIRE_RASTER is set)") {}))
+    (println (str "[raster-test] " msg "; skipping"))))
+
 (def ^:private raster?
   (try (require 'emmy.viewer.raster)
        true
        (catch Exception ex
          (if (re-find #"raster" (str (ex-message ex) (some-> ex ex-cause ex-message)))
-           (do (println "[raster-test] raster not on the classpath (use -M:test:raster); skipping")
+           (do (skip! "raster not on the classpath (use -M:test:raster)")
                false)
            (throw ex)))))
 
 (def ^:private node?
   (let [ok (try (zero? (:exit (sh/sh "node" "--version")))
-                (catch java.io.IOException _ false))]
-    (when-not ok (println "[raster-test] node not on the path; skipping"))
+                (catch java.io.IOException _node-not-installed false))]
+    (when-not ok (skip! "node not on the path"))
     ok))
 
 (defn- run-node

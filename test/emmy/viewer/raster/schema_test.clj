@@ -13,6 +13,8 @@
   (try (require 'emmy.viewer.raster.schema 'malli.core 'malli.generator)
        true
        (catch java.io.FileNotFoundException _
+         (when (System/getenv "EMMY_VIEWERS_REQUIRE_RASTER")
+           (throw (ex-info "malli not on the classpath (EMMY_VIEWERS_REQUIRE_RASTER is set)" {})))
          (println "[schema-test] malli not on the classpath (use -M:test:raster); skipping")
          false)))
 
