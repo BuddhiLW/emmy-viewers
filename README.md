@@ -325,6 +325,11 @@ to know:
 - A function raster cannot compile (a literal function, an operator outside its
   vocabulary) throws at build time and names the form. Bind `:js` for that
   viewer.
+- The backend is layered: `emmy.viewer.raster.plan` (the algebra),
+  `emmy.viewer.raster.lower` (raster's vocabulary) and
+  `emmy.viewer.raster.glue` (the browser side) are pure, with malli contracts in
+  `emmy.viewer.raster.schema`; `emmy.viewer.raster` is the only place a kernel
+  is evaluated or compiled.
 - Each fragment also carries the `:js` function. A browser without WebAssembly
   uses it, and so does any call made while a module larger than 4 KB is still
   compiling asynchronously.

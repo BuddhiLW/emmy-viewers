@@ -18,11 +18,18 @@
     (emmy.mafs/of-x (fn [x] (* x (sin x)))))
   ```
 
+  Layers: [[emmy.viewer.raster.plan]] (the algebra), [[emmy.viewer.raster.lower]]
+  (raster's vocabulary) and [[emmy.viewer.raster.glue]] (the JS) are pure; their
+  contracts live in [[emmy.viewer.raster.schema]]. This namespace is the
+  boundary: the only place a kernel is evaluated or compiled.
+
   Requires raster on the classpath (the `:raster` alias). A function raster cannot
-  compile (an operator outside [[emmy.viewer.raster.kernel/lower]]'s vocabulary)
+  compile (an operator outside [[emmy.viewer.raster.lower/lower]]'s vocabulary)
   throws at build time, naming the form."
   (:require [emmy.expression.compile :as xc]
-            [emmy.viewer.raster.kernel :as k]
+            [emmy.viewer.raster.glue :as glue]
+            [emmy.viewer.raster.lower :as lower]
+            [emmy.viewer.raster.plan :as plan]
             [raster.compiler.pipeline :as pl]
             [raster.core]
             [raster.math]
@@ -66,18 +73,22 @@
 (defn modules
   "The wasm modules, one per output of `plan`, as byte arrays."
   [plan]
-  (mapv wasm-bytes (k/kernel-forms plan (fn [_] (gensym "kernel")))))
+  (mapv wasm-bytes (lower/kernel-forms plan (fn [_] (gensym "kernel")))))
 
 (defn- base64 [^bytes bs]
   (.encodeToString (Base64/getEncoder) bs))
 
 (defn compiled-fn
   "The raster implementation of [[emmy.viewer.compile/compiled-fn]]: a form that
-  evaluates, in the browser, to the compiled function."
+  evaluates, in the browser, to the compiled function.
+
+  Collect and promote ([[emmy.viewer.raster.plan]]), pipeline
+  ([[emmy.viewer.raster.lower]], [[emmy.viewer.raster.glue]]) are pure; this is
+  the boundary, where kernels are evaluated and compiled."
   [f params initial-state opts]
-  (let [plan     (k/plan f params initial-state opts)
-        mods     (modules plan)
-        sync?    (every? #(<= (alength ^bytes %) k/sync-limit) mods)
+  (let [p        (plan/plan f params initial-state opts)
+        mods     (modules p)
+        sync?    (every? #(<= (alength ^bytes %) glue/sync-limit) mods)
         fallback (xc/compile-state-fn f params initial-state (assoc opts :mode :js))]
-    (list (list 'js/Function. "fb" (k/glue plan (mapv base64 mods) sync?))
+    (list (list 'js/Function. "fb" (glue/glue p (mapv base64 mods) sync?))
           (list* 'js/Function. fallback))))

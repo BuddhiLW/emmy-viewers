@@ -12,7 +12,7 @@
             [emmy.env :as e]
             [emmy.mechanics.lagrange :as l]
             [emmy.viewer.compile :as vc]
-            [emmy.viewer.raster.kernel :as k]))
+            [emmy.viewer.raster.plan :as plan]))
 
 (def ^:private raster?
   (try (require 'emmy.viewer.raster)
@@ -78,7 +78,7 @@
    (let [form  (binding [vc/*backend* :raster]
                  (vc/compiled-fn f params initial-state opts))
          conv  (:calling-convention opts :structure)
-         n-out (count (:outputs (k/plan f params initial-state opts)))
+         n-out (count (:outputs (plan/plan f params initial-state opts)))
          {:keys [wasm raster js]} (run-node form conv n-out cases)]
      (is (true? wasm) "the kernels loaded synchronously")
      (doseq [[c r j] (map vector cases raster js)
