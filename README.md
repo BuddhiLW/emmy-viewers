@@ -299,16 +299,33 @@ coming soon.
 ## Computational Backends
 
 Every function a viewer plots is compiled on the JVM before it reaches the
-browser. The backend that compiles it is chosen by
-`emmy.viewer.compile/*backend*`:
+browser. Every compiled **Kernel**, whichever backend produced it, is callable
+using Emmy's original calling convention (`:native`, `:structure`, or
+`:primitive`) and carries the same browser-side contract:
 
-- `:js` (the default) emits JavaScript source through Emmy's `:js` compile mode.
-- `:raster` compiles the function to one import-free WebAssembly module with
-  [raster](https://github.com/replikativ/raster). Emmy still simplifies the
-  function symbolically and shares common subexpressions across its outputs;
-  raster compiles the result into a kernel that evaluates every output of many
-  points in one call. The module ships inside the fragment and keeps the `:js`
-  calling convention, so no viewer changes.
+- `f.batch(xs, n, ps, out)` evaluates `n` points from flattened row-major input
+  states `xs`, using parameters `ps`, into `out` (or an allocated output buffer).
+- `f.ready()` reports whether the kernel is ready to execute.
+- `f.dims` gives the scalar counts `{state, outputs, params}`.
+
+Viewers depend on the ClojureScript namespace `emmy.viewer.kernel`, not on a
+particular backend: `kernel?`, `ready?`, `dims`, `batch!`, `bind`, and `bind-1d`
+expose and preserve that contract. MathBox explicit surfaces sample their full
+grid through `batch!` when the function is a Kernel and both ranges are given;
+other functions retain per-point sampling.
+
+On the JVM, backends implement `emmy.viewer.kernel.backend/KernelBackend` with
+one method, `kernel-form`, and are added using `register-backend!`. The dynamic
+var `emmy.viewer.compile/*backend*` accepts either a registered keyword or a
+backend value:
+
+- `:js` (the default) emits Emmy JavaScript with a batch adapter attached to
+  the same per-point function.
+- `:raster` compiles to WebAssembly with
+  [raster](https://github.com/replikativ/raster). Emmy simplifies the function
+  symbolically and raster compiles the output to a kernel that evaluates many
+  points in one call. The module ships inside the fragment with Emmy's original
+  calling convention and a JavaScript fallback.
 
 ```clojure
 (require '[emmy.viewer.compile :as vc])
@@ -317,12 +334,11 @@ browser. The backend that compiles it is chosen by
   (emmy.mafs/of-x (fn [x] (* x (sin x)))))
 ```
 
-Besides the usual per-point call, a raster-compiled function has
-`f.batch(xs, n, ps, out)`, which evaluates `n` points (their flattened states,
-row-major in `xs`) in a single WebAssembly call and returns a `Float64Array` of
-the outputs.
+**Upgrading:** Existing viewer call sites stay the same. Choosing `:raster`
+only changes the backend binding; introducing another backend means registering
+an implementation of `KernelBackend`, not editing viewers or compile call sites.
 
-Measured with `clojure -M:raster:bench` (node 22, JDK 25, ns per point; see
+Measured with `clojure -J-Xmx2g -M:raster:bench` (node 22, JDK 25, ns per point; see
 `bench/`):
 
 | function | `:js` | `:raster` per point | `:raster` batch |
@@ -347,11 +363,11 @@ to know:
 - A function raster cannot compile (a literal function, an operator outside its
   vocabulary) throws at build time and names the form. Bind `:js` for that
   viewer.
-- The backend is layered: `emmy.viewer.raster.plan` (the algebra),
+- The backend is layered: `emmy.viewer.kernel.plan` is backend-neutral;
   `emmy.viewer.raster.lower` (raster's vocabulary) and
-  `emmy.viewer.raster.glue` (the browser side) are pure, with malli contracts in
-  `emmy.viewer.raster.schema`; `emmy.viewer.raster` is the only place a kernel
-  is evaluated or compiled.
+  `emmy.viewer.raster.glue` (the browser side) are pure. Shared malli contracts
+  live in `emmy.viewer.kernel.schema`, raster-specific ones in
+  `emmy.viewer.raster.schema`; `emmy.viewer.raster` is the compilation boundary.
 - Each fragment also carries the `:js` function. A browser without WebAssembly
   uses it, and so does any call made while a module larger than 4 KB is still
   compiling asynchronously (`f.batch` returns null then).

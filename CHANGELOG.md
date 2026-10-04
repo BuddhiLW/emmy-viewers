@@ -2,15 +2,24 @@
 
 ## [unreleased]
 
-- Adds computational backends. Every compile site (`compile-1d`, `compile-2d`,
-  MathBox's `compile-3d`, physics' `ode-compile`) now goes through
-  `emmy.viewer.compile/compiled-fn`, an open multimethod on
-  `emmy.viewer.compile/*backend*`. `:js` is the default and emits the same
-  forms as before.
+- Adds the Kernel contract to every compile site (`compile-1d`, `compile-2d`,
+  MathBox's `compile-3d`, physics' `ode-compile`) via
+  `emmy.viewer.compile/compiled-fn`. `emmy.viewer.kernel.backend/KernelBackend`
+  has a single `kernel-form` method; `register-backend!` makes new backends
+  available without changing call sites. `*backend*` accepts a keyword or a
+  backend value.
 
-- Adds the `:raster` backend (`emmy.viewer.raster`, `:raster` alias): Emmy
-  functions compiled to WebAssembly by raster, with the `:js` function as a
-  fallback.
+- Both the default `:js` backend and the `:raster` WebAssembly backend now emit
+  functions with Emmy's per-point convention plus `batch(xs, n, ps, out)`,
+  `ready()`, and `dims`. Raster retains the `:js` fallback; `:js` attaches its
+  batch adapter without wrapping its per-point function.
+
+- Adds browser-side `emmy.viewer.kernel` (`kernel?`, `ready?`, `dims`, `batch!`,
+  `bind`, `bind-1d`). MathBox explicit surfaces batch their entire grid through
+  this contract when a Kernel and both ranges are supplied.
+
+- Adds shared malli contracts in `emmy.viewer.kernel.schema` for the Plan,
+  convention, dimensions, and open backend domain.
 
 ## [0.3.2]
 
