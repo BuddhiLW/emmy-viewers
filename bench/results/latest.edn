@@ -3,122 +3,170 @@
  :opts {:n-inputs 1024, :build-reps 5, :trials 15, :min-trial-ms 40},
  :results
  [{:payload
-   {:js-chars 58, :raster-chars 2076, :wasm-bytes 252, :outputs 1},
+   {:js-chars 390, :raster-chars 2150, :wasm-bytes 252, :outputs 1},
    :id :x-sin-x,
    :doc "Mafs of-x: x sin x",
-   :build {:js-ms 0.83313, :raster-ms 123.818914},
+   :build {:js-ms 1.953364, :raster-ms 201.071294},
    :runtime
    {:variants
     {:js
-     {:median 25.494688987731934,
-      :p10 21.06636381149292,
-      :p90 32.97205972671509},
+     {:median 21.087721824645996,
+      :p10 20.942725658416748,
+      :p90 23.08965301513672},
+     :js-batch
+     {:median 10.273965835571289,
+      :p10 10.175241708755493,
+      :p90 10.369377851486206},
      :raster
-     {:median 22.28116750717163,
-      :p10 21.897264003753662,
-      :p90 22.890243530273438},
-     :batch
-     {:median 5.658015847206116,
-      :p10 5.397851824760437,
-      :p90 7.4583070278167725}}},
+     {:median 22.040733337402344,
+      :p10 21.9007887840271,
+      :p90 22.1925368309021},
+     :raster-batch
+     {:median 5.500999569892883,
+      :p10 5.453811407089233,
+      :p90 5.566783547401428}}},
    :max-abs-diff 2.099266500488195E-5}
   {:payload
-   {:js-chars 133, :raster-chars 2115, :wasm-bytes 223, :outputs 1},
+   {:js-chars 465, :raster-chars 2189, :wasm-bytes 223, :outputs 1},
    :id :poly-7,
    :doc "Mafs of-x: a degree-7 polynomial (no transcendentals)",
-   :build {:js-ms 1.775371, :raster-ms 139.306166},
+   :build {:js-ms 2.462818, :raster-ms 245.696602},
    :runtime
    {:variants
     {:js
-     {:median 259.58641052246094,
-      :p10 256.1097106933594,
-      :p90 269.7683753967285},
+     {:median 261.2829399108887,
+      :p10 218.38576126098633,
+      :p90 309.1964454650879},
+     :js-batch
+     {:median 212.09919357299805,
+      :p10 171.3075408935547,
+      :p90 223.76126098632812},
      :raster
-     {:median 35.4653902053833,
-      :p10 34.19760704040527,
-      :p90 53.00493812561035},
-     :batch
-     {:median 4.047466278076172,
-      :p10 3.8417720198631287,
-      :p90 4.602784335613251}}},
+     {:median 34.91974687576294,
+      :p10 34.66115999221802,
+      :p90 40.63028621673584},
+     :raster-batch
+     {:median 3.7250671982765198,
+      :p10 3.67916202545166,
+      :p90 3.7816532254219055}}},
    :max-abs-diff 1.8189894035458565E-12}
   {:payload
-   {:js-chars 75, :raster-chars 2316, :wasm-bytes 406, :outputs 2},
+   {:js-chars 440, :raster-chars 2390, :wasm-bytes 406, :outputs 2},
    :id :parametric,
    :doc "Mafs parametric: (cos t, sin 2t)",
-   :build {:js-ms 2.79189, :raster-ms 96.193461},
+   :build {:js-ms 5.867328, :raster-ms 127.861435},
    :runtime
    {:variants
     {:js
-     {:median 70.16175556182861,
-      :p10 69.11605548858643,
-      :p90 71.86167049407959},
+     {:median 75.61788845062256,
+      :p10 73.0559949874878,
+      :p90 104.7627010345459},
+     :js-batch
+     {:median 28.106090545654297,
+      :p10 27.975170612335205,
+      :p90 34.66602087020874},
      :raster
-     {:median 53.45145130157471,
-      :p10 52.526000022888184,
-      :p90 54.093971252441406},
-     :batch
-     {:median 9.688757181167603,
-      :p10 9.567219734191895,
-      :p90 9.888287544250488}}},
+     {:median 56.16916084289551,
+      :p10 54.10449409484863,
+      :p90 67.17399311065674},
+     :raster-batch
+     {:median 9.634994745254517,
+      :p10 9.543222427368164,
+      :p90 9.813509464263916}}},
    :max-abs-diff 1.668645514290261E-5}
   {:payload
-   {:js-chars 108, :raster-chars 2210, :wasm-bytes 289, :outputs 1},
+   {:js-chars 446, :raster-chars 2284, :wasm-bytes 289, :outputs 1},
    :id :param-1d,
    :doc "Mafs of-x with sliders a, b: a sin(bx) + x^2",
-   :build {:js-ms 1.783842, :raster-ms 254.495371},
+   :build {:js-ms 2.321617, :raster-ms 223.095518},
    :runtime
    {:variants
     {:js
-     {:median 44.12775897979736,
-      :p10 43.36999797821045,
-      :p90 50.83761787414551},
+     {:median 69.41597652435303,
+      :p10 45.49028396606445,
+      :p90 85.04507732391357},
+     :js-batch
+     {:median 26.688919067382812,
+      :p10 25.844254970550537,
+      :p90 29.091403007507324},
      :raster
-     {:median 26.123522758483887,
-      :p10 25.88422155380249,
-      :p90 26.435111045837402},
-     :batch
-     {:median 6.5465171337127686,
-      :p10 6.277153134346008,
-      :p90 6.871935248374939}}},
+     {:median 30.772770881652832,
+      :p10 26.42376470565796,
+      :p90 44.558762550354004},
+     :raster-batch
+     {:median 6.075238585472107,
+      :p10 5.391499161720276,
+      :p90 6.192959666252136}}},
    :max-abs-diff 2.1372507930994544E-5}
   {:payload
-   {:js-chars 290, :raster-chars 3172, :wasm-bytes 829, :outputs 3},
+   {:js-chars 869, :raster-chars 3246, :wasm-bytes 829, :outputs 3},
    :id :surface,
    :doc "MathBox surface: sin x cos y exp(-(x^2+y^2)/4)",
-   :build {:js-ms 4.929925, :raster-ms 131.179183},
+   :build {:js-ms 2.86049, :raster-ms 156.694511},
    :runtime
    {:variants
     {:js
-     {:median 58.41174507141113,
-      :p10 54.15195560455322,
-      :p90 63.74981880187988},
+     {:median 54.979493141174316,
+      :p10 49.75602722167969,
+      :p90 59.01618957519531},
+     :js-batch
+     {:median 156.8016700744629,
+      :p10 138.6017723083496,
+      :p90 187.58374786376953},
      :raster
-     {:median 43.76174449920654,
-      :p10 36.75116539001465,
-      :p90 57.38135528564453},
-     :batch
-     {:median 25.598917961120605,
-      :p10 25.058218955993652,
-      :p90 27.793169498443604}}},
+     {:median 35.98416471481323,
+      :p10 35.71357488632202,
+      :p90 36.34235858917236},
+     :raster-batch
+     {:median 18.83658790588379,
+      :p10 16.19972324371338,
+      :p90 25.113171577453613}}},
    :max-abs-diff 5.416102143385171E-6}
   {:payload
-   {:js-chars 1165, :raster-chars 4506, :wasm-bytes 1084, :outputs 5},
-   :id :double-pendulum,
-   :doc "physics evolve: double-pendulum state derivative, 5 params",
-   :build {:js-ms 18.060282, :raster-ms 422.411837},
+   {:js-chars 459, :raster-chars 2479, :wasm-bytes 433, :outputs 1},
+   :id :surface-64,
+   :doc "MathBox 64x64 grid: a sin(bx) cos(y)",
+   :build {:js-ms 1.74312, :raster-ms 203.248914},
    :runtime
    {:variants
     {:js
-     {:median 76.31370162963867,
-      :p10 75.21185302734375,
-      :p90 147.62267112731934},
+     {:median 85.39775276184082,
+      :p10 83.67611694335938,
+      :p90 101.5441780090332},
+     :js-batch
+     {:median 47.96305465698242,
+      :p10 43.993836402893066,
+      :p90 54.73438262939453},
      :raster
-     {:median 54.478023529052734,
-      :p10 54.282742500305176,
-      :p90 58.06650352478027},
-     :batch
-     {:median 27.919260025024414,
-      :p10 27.635597229003906,
-      :p90 28.638676166534424}}},
+     {:median 43.29957580566406,
+      :p10 42.919349670410156,
+      :p90 43.78319454193115},
+     :raster-batch
+     {:median 10.035117864608765,
+      :p10 8.790709972381592,
+      :p90 10.069085597991943}}},
+   :max-abs-diff 2.1502381418550673E-5}
+  {:payload
+   {:js-chars 1744, :raster-chars 4580, :wasm-bytes 1084, :outputs 5},
+   :id :double-pendulum,
+   :doc "physics evolve: double-pendulum state derivative, 5 params",
+   :build {:js-ms 21.758492, :raster-ms 444.595375},
+   :runtime
+   {:variants
+    {:js
+     {:median 88.31168746948242,
+      :p10 77.85011863708496,
+      :p90 126.3142318725586},
+     :js-batch
+     {:median 147.38102912902832,
+      :p10 146.4830837249756,
+      :p90 168.25750732421875},
+     :raster
+     {:median 51.63871669769287,
+      :p10 51.28755474090576,
+      :p90 52.1079740524292},
+     :raster-batch
+     {:median 27.80284309387207,
+      :p10 27.571946144104004,
+      :p90 28.020246982574463}}},
    :max-abs-diff 2.9630842900435495E-4}]}
