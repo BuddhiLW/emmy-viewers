@@ -60,12 +60,15 @@
                      "};\n"
                      "const cases = " (json/write-str cases) ";\n"
                      "const inputs = cases.flatMap((c) => flat(" (if (= convention :native) "c" "c[0]") "));\n"
-                     "const many = Array.from(f.batch(new Float64Array(inputs), cases.length, "
-                     (if (= convention :native) "null" "cases[0][1]") "));\n"
-                     "console.log(JSON.stringify({wasm: typeof f.wasm === 'function' ? f.wasm() : null, ready: f.ready(), dims: f.dims, same: f === fb,"
+                     "const ps = " (if (= convention :native) "null" "cases[0][1]") ";\n"
+                     "const buffer = new Float64Array(cases.length * " n-out ");\n"
+                     "const returned = f.batch(new Float64Array(inputs), cases.length, ps, buffer);\n"
+                     "const many = Array.from(buffer);\n"
+                     "const plain = Array.from(f.batch(inputs, cases.length, ps));\n"
+                     "console.log(JSON.stringify({wasm: typeof f.wasm === 'function' ? f.wasm() : null, ready: f.ready(), dims: f.dims, same: f === fb, sameOut: returned === buffer,"
                      " raster: cases.map((c) => run(f, c)),"
                      " js: cases.map((c) => run(fb, c)),"
-                     " batch: cases.map(batch), many}));\n")
+                     " batch: cases.map(batch), many, plain}));\n")
         file (java.io.File/createTempFile "raster-backend" ".js")]
     (spit file program)
     (let [{:keys [exit out err]} (sh/sh "node" (str file))]
@@ -145,16 +148,18 @@
               result (run-node (binding [vc/*backend* :js]
                                  (vc/compiled-fn f params initial-state opts))
                                (:convention p) (count (:outputs p)) cases)
-              {:keys [ready dims same raster js batch many]} result]
+              {:keys [ready dims same sameOut raster js batch many plain]} result
+              want (mapcat #(flatten (if (number? %) [%] %)) raster)]
           (is (true? same) "the adapter returns Emmy's function, not a wrapper")
+          (is (true? sameOut) "batch returns the supplied output buffer")
           (is (true? ready))
           (is (= {:state (count (:state p)) :outputs (count (:outputs p))
                   :params (count (:params p))} dims))
           (doseq [[r j b] (map vector raster js batch)]
             (is (close? r j))
             (is (close? (flatten (if (number? r) [r] r)) b)))
-          (is (close? (mapcat #(flatten (if (number? %) [%] %)) raster) many)
-              "typed multi-row batch agrees with all per-point calls"))))))
+          (is (close? want many) "typed multi-row batch agrees with per-point")
+          (is (close? want plain) "plain-array multi-row batch agrees with per-point"))))))
 
 (deftest raster-backend-test
   (when (and raster? node?)
