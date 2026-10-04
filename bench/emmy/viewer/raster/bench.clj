@@ -6,12 +6,12 @@
   - build cost on the JVM: `compile-state-fn` in :js mode against the raster
     pipeline (plan, lowering, and raster's eval + wasm compile per output);
   - payload: characters of the form a viewer binds, for each backend;
-  - runtime in node (V8), ns per call over the same inputs: the :js
-    function, the :raster glue function a viewer calls, and the bare wasm
-    kernels (the glue's own cost is the difference);
-  - agreement: the largest absolute difference between :raster and :js.
+  - runtime in node (V8), ns per point over the same inputs: :js and :raster
+    each called per point and once per complete batch;
+  - agreement: the largest absolute difference between either batch or raster
+    per-point evaluation and :js per-point evaluation.
 
-  Run with `clojure -M:raster:bench`. Writes bench/results/latest.edn and
+  Run with `clojure -J-Xmx2g -M:raster:bench`. Writes bench/results/latest.edn and
   prints a table."
   (:require [clojure.data.json :as json]
             [clojure.java.io :as io]
