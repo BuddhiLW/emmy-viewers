@@ -338,17 +338,20 @@ backend value:
 only changes the backend binding; introducing another backend means registering
 an implementation of `KernelBackend`, not editing viewers or compile call sites.
 
-Measured with `clojure -J-Xmx2g -M:raster:bench` (node 22, JDK 25, ns per point; see
-`bench/`):
+Measured with `clojure -J-Xmx2g -M:raster:bench` (node 22, JDK 25, ns per
+point; see `bench/results/latest.edn`). Each batch pass evaluates all points;
+`surface-64` is a complete 64×64 grid on [-3, 3]² with two parameters.
+Measurements vary by machine and run:
 
-| function | `:js` | `:raster` per point | `:raster` batch |
-|---|---|---|---|
-| `x sin x` | 25.5 | 22.3 (1.1x) | 5.7 (4.5x) |
-| degree-7 polynomial | 259.6 | 35.5 (7.3x) | 4.0 (64x) |
-| parametric curve, 2 outputs | 70.2 | 53.5 (1.3x) | 9.7 (7.2x) |
-| `a sin(bx) + x^2`, 2 params | 44.1 | 26.1 (1.7x) | 6.5 (6.7x) |
-| MathBox surface, 3 outputs | 58.4 | 43.8 (1.3x) | 25.6 (2.3x) |
-| double-pendulum state derivative | 76.3 | 54.5 (1.4x) | 27.9 (2.7x) |
+| function | `:js` per point | `:js` batch | `:raster` per point | `:raster` batch |
+|---|---:|---:|---:|---:|
+| `x sin x` | 21.1 | 10.3 | 22.0 | 5.5 |
+| degree-7 polynomial | 261.3 | 212.1 | 34.9 | 3.7 |
+| parametric curve, 2 outputs | 75.6 | 28.1 | 56.2 | 9.6 |
+| `a sin(bx) + x²`, 2 params | 69.4 | 26.7 | 30.8 | 6.1 |
+| MathBox surface, 3 outputs | 55.0 | 156.8 | 36.0 | 18.8 |
+| `surface-64`: `a sin(bx) cos(y)` | 85.4 | 48.0 | 43.3 | 10.0 |
+| double-pendulum state derivative | 88.3 | 147.4 | 51.6 | 27.8 |
 
 The raster backend needs raster on the classpath (the `:raster` alias). Things
 to know:
