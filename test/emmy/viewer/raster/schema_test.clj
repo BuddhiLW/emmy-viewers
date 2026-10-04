@@ -41,18 +41,18 @@
   (when malli?
     (doseq [[f params init opts] cases
             :let [p (plan/plan f params init opts)]]
-      (is (valid? (sv 'emmy.viewer.raster.schema/Plan) p)
-          (pr-str (explain (sv 'emmy.viewer.raster.schema/Plan) p))))))
+      (is (valid? (sv 'emmy.viewer.kernel.schema/Plan) p)
+          (pr-str (explain (sv 'emmy.viewer.kernel.schema/Plan) p))))))
 
 (deftest convention-enum-derives-from-the-domain
   (when malli?
     (is (= (into [:enum] plan/conventions)
-           (sv 'emmy.viewer.raster.schema/Convention)))))
+           (sv 'emmy.viewer.kernel.schema/Convention)))))
 
 (deftest backend-stays-open
   (when malli?
     (testing "a backend nobody has registered yet is still a valid Backend"
-      (is (valid? (sv 'emmy.viewer.raster.schema/Backend) :gpu)))))
+      (is (valid? (sv 'emmy.viewer.kernel.schema/Backend) :gpu)))))
 
 (deftest function-schemas-hold-under-instrumentation
   (when malli?
@@ -71,7 +71,7 @@
 (deftest glue-is-total-over-generated-plans
   (when malli?
     (let [generate (sv 'malli.generator/generate)
-          plan-s   (sv 'emmy.viewer.raster.schema/Plan)]
+          plan-s   (sv 'emmy.viewer.kernel.schema/Plan)]
       (dotimes [seed 50]
         (let [p   (generate plan-s {:seed seed :size 6})
               src (glue/glue p "AA==" (even? seed))]
