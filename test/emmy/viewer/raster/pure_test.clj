@@ -112,7 +112,10 @@
         (is (str/includes? src "k(4096, 8388608, 0, 1);"))
         (is (str/includes? src "yps[2] = F[1048578];"))
         (is (str/includes? src "setPs(ps);"))
-        (is (str/includes? src "f.batch = function(xs, n, ps, out)")))))
+        (is (str/includes? src "f.batch = function(xs, n, ps, out)"))
+        (is (str/includes? src "f.wasm = () => k !== null;"))
+        (is (str/includes? src "f.ready = () => k !== null;"))
+        (is (str/includes? src "f.dims = {state: 2, outputs: 3, params: 1};")))))
   (testing "a native function takes its arguments positionally and allocates only its result"
     (let [src (glue/glue {:convention :native :state '[s0] :params []
                           :outputs '[a b] :shape [0 1]}
@@ -120,6 +123,7 @@
       (is (str/includes? src "function(s0)"))
       (is (str/includes? src "F[512] = s0;"))
       (is (str/includes? src "return [F[1048576], F[1048577]];"))
+      (is (str/includes? src "f.dims = {state: 1, outputs: 2, params: 0};"))
       (is (str/includes? src "const f = function(s0) {\n  if (k === null) return fb(s0);\n  F[512] = s0;\n  k(4096, 8388608, 0, 1);")))))
 
 (deftest backend-test
