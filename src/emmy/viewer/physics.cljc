@@ -38,6 +38,8 @@
                            {:generic-params? params?
                             :simplify? simplify?
                             :calling-convention :primitive})
+                          ;; Odex calls (fn [in out]); its primitive kernel needs
+                          ;; a mutable output and JS-array params, not bind's (state ps).
                           (if params?
                             `(let [psym# (apply ~'array (map @~(:atom v) ~params))]
                                (fn [in# out#]
