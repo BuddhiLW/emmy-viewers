@@ -1,4 +1,18 @@
-(ns emmy.viewer.kernel)
+(ns emmy.viewer.kernel
+  "The browser side of the Kernel contract: the only API viewers use to talk to a
+  compiled function.
+
+  Every kernel, whichever backend compiled it, is a JS function callable in
+  Emmy's calling convention that also carries:
+
+  - `batch(xs, n, ps, out)`: evaluates `n` points (their flattened states,
+    row-major in `xs`) and returns the outputs, row-major, in a Float64Array;
+  - `ready()`: whether the kernel can evaluate yet (an asynchronously compiled
+    module is not ready at first);
+  - `dims`: `{state, outputs, params}`.
+
+  Viewers call these functions instead of the properties, so a backend can
+  change how it meets the contract without any viewer changing.")
 
 (defn kernel?
   "True when f is callable and implements the batch kernel contract."
@@ -23,24 +37,23 @@
   [k xs n ps out]
   ((.-batch ^js k) xs n ps out))
 
+(defn- forward-contract!
+  "Gives `g`, a per-point function derived from kernel `k` with parameters `ps`
+  fixed, the rest of `k`'s contract. The property names are those JS reads, so
+  the writes carry ^js and survive advanced compilation."
+  [^js g k ps]
+  (when (kernel? k)
+    (set! (.-batch g) (fn [xs n _ignored out] (batch! k xs n ps out)))
+    (set! (.-ready g) (fn [] (ready? k)))
+    (set! (.-dims g) (.-dims ^js k)))
+  g)
+
 (defn bind
   "Fix ps in k. A kernel retains its batch, ready and dimensions contract; a plain function stays plain."
   [k ps]
-  (let [g (fn [state] (k state ps))]
-    (when (kernel? k)
-      (set! (.-batch g) (fn [xs n _ignored out]
-                          (batch! k xs n ps out)))
-      (set! (.-ready g) (fn [] (ready? k)))
-      (set! (.-dims g) (.-dims ^js k)))
-    g))
+  (forward-contract! (fn [state] (k state ps)) k ps))
 
 (defn bind-1d
   "Fix ps in k and accept a scalar x as a one-element state. Preserve the kernel's batch contract."
   [k ps]
-  (let [g (fn [x] (k [x] ps))]
-    (when (kernel? k)
-      (set! (.-batch g) (fn [xs n _ignored out]
-                          (batch! k xs n ps out)))
-      (set! (.-ready g) (fn [] (ready? k)))
-      (set! (.-dims g) (.-dims ^js k)))
-    g))
+  (forward-contract! (fn [x] (k [x] ps)) k ps))
