@@ -9,7 +9,8 @@
             [emmy.viewer.compile :as vc]
             [emmy.viewer.raster.glue :as glue]
             [emmy.viewer.raster.lower :as lower]
-            [emmy.viewer.kernel.plan :as plan]))
+            [emmy.viewer.kernel.plan :as plan]
+            [emmy.viewer.kernel.backend :as backend]))
 
 (deftest lower-test
   (testing "integer powers become products, so a negative base stays defined"
@@ -132,6 +133,11 @@
       (is (str/includes? src "f.dims = {state: 1, outputs: 2, params: 0};"))
       (is (str/includes? src "const f = function(s0) {\n  if (k === null) return fb(s0);\n  F[512] = s0;\n  k(4096, 8388608, 0, 1);")))))
 
+(defrecord TestBackend []
+  backend/KernelBackend
+  (kernel-form [_ f params initial-state opts]
+    [:custom f params initial-state opts]))
+
 (deftest backend-test
   (let [f (fn [x] (e/* x (e/sin x)))]
     (testing ":js is the default and emits Emmy's js/Function call"
@@ -142,6 +148,19 @@
                                                       :mode :js}))
              (vc/compiled-fn f false [0] {:calling-convention :native
                                           :arity 1}))))
+    (testing "a backend value substitutes without registration"
+      (let [b (->TestBackend)]
+        (is (identical? b (backend/resolve-backend b)))
+        (is (= [:custom f false [0] {}]
+               (binding [vc/*backend* b] (vc/compiled-fn f false [0] {}))))))
+    (testing "an open registry accepts new keyword backends"
+      (try
+        (backend/register-backend! :test-backend (->TestBackend))
+        (is (= [:custom f false [0] {}]
+               (binding [vc/*backend* :test-backend]
+                 (vc/compiled-fn f false [0] {}))))
+        (finally
+          (backend/register-backend! :test-backend nil))))
     (testing "an unknown backend is refused"
       (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Unknown compile backend :gpu"
                             (binding [vc/*backend* :gpu]

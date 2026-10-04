@@ -4,7 +4,8 @@
 
   See [[emmy.mafs.plot]] and [[emmy.mathbox.plot]] for example uses."
   (:require [emmy.expression.compile :as xc]
-            [emmy.viewer :as v]))
+            [emmy.viewer :as v]
+            [emmy.viewer.kernel.backend :as backend]))
 
 (defn compile?
   "Returns true if `f` is an argument that should be compiled by Emmy, false
@@ -43,7 +44,9 @@
 ;; ## Computational Backends
 
 (def ^:dynamic *backend*
-  "The computational backend that compiles Emmy functions for the viewers:
+  "The computational backend that compiles Emmy functions for the viewers.
+  Accepts a registered keyword or a KernelBackend value; use
+  [[emmy.viewer.kernel.backend/register-backend!]] to register new backends.
 
   - `:js` (default): JavaScript source, from Emmy's `:js` compile mode.
   - `:raster`: WebAssembly, compiled by raster on the JVM. Needs raster on the
@@ -57,10 +60,11 @@
   ```"
   :js)
 
-(defmulti compiled-fn*
-  "Backend implementation of [[compiled-fn]], dispatched on the backend
-  keyword."
-  (fn [backend _f _params _initial-state _opts] backend))
+(defrecord JsBackend []
+  backend/KernelBackend
+  (kernel-form [_ f params initial-state opts]
+    (list* 'js/Function.
+           (xc/compile-state-fn f params initial-state (assoc opts :mode :js)))))
 
 (defn compiled-fn
   "Returns a form that evaluates, in the browser, to `f` compiled by
@@ -70,22 +74,10 @@
   `:mode`, and the compiled function has the same calling convention whichever
   backend compiles it."
   [f params initial-state opts]
-  (compiled-fn* *backend* f params initial-state opts))
+  (backend/kernel-form (backend/resolve-backend *backend*)
+                       f params initial-state opts))
 
-(defmethod compiled-fn* :js [_ f params initial-state opts]
-  (list* 'js/Function.
-         (xc/compile-state-fn f params initial-state (assoc opts :mode :js))))
-
-#?(:clj
-   (defmethod compiled-fn* :raster [_ f params initial-state opts]
-     ((requiring-resolve 'emmy.viewer.raster/compiled-fn)
-      f params initial-state opts)))
-
-(defmethod compiled-fn* :default [backend & _]
-  (throw
-   (ex-info (str "Unknown compile backend " (pr-str backend)
-                 "; known: " (pr-str (keys (methods compiled-fn*))))
-            {:backend backend})))
+(backend/register-backend! :js (->JsBackend))
 
 ;; ## Compile Functions
 
