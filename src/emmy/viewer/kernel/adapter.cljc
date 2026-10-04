@@ -27,7 +27,11 @@
 (defn adapter-source
   "Returns JS source for a function accepting Emmy's compiled function `fb` and
   returning that SAME function with batch, ready and dims attached. The point
-  path remains Emmy's original function, without any wrapper or allocation."
+  path remains Emmy's original function, without any wrapper or allocation.
+
+  A `:primitive` batch reuses one input row and one result row for every
+  point, copying through them with unrolled assignments, so it allocates
+  nothing per point (a subarray view per row would cost two allocations)."
   [{:keys [convention state state-shape outputs shape params]}]
   (let [d (count state)
         m (count outputs)
@@ -41,17 +45,18 @@
                (throw (ex-info (str "Unknown kernel calling convention " convention)
                                {:convention convention})))
         body (if (= convention :primitive)
-               (str "    const row = typed ? xs.subarray(r, r + " d ") : scratch;\n"
-                    "    if (!typed) for (let j = 0; j < " d "; j++) row[j] = xs[r + j];\n"
-                    "    fb(row, out.subarray(col, col + " m "), ps);")
+               (str (str/join (map (fn [j] (str "    row[" j "] = xs[r" (when (pos? j) (str " + " j)) "];\n"))
+                                   (range d)))
+                    "    fb(row, res, ps);\n"
+                    (str/join "\n" (map (fn [j] (str "    out[col" (when (pos? j) (str " + " j)) "] = res[" j "];"))
+                                        (range m))))
                (str "    const value = " call ";\n"
                     (output-writes result-shape "value" "col")))]
     (str/join "\n"
               ["fb.batch = function(xs, n, ps, out) {"
                (str "  out = out || new Float64Array(n * " m ");")
                (when (= convention :primitive)
-                 (str "  const typed = ArrayBuffer.isView(xs) && typeof xs.subarray === 'function';\n"
-                      "  const scratch = typed ? null : new Float64Array(" d ");"))
+                 (str "  const row = new Float64Array(" d "), res = new Float64Array(" m ");"))
                (str "  for (let i = 0; i < n; i++) {\n"
                     "    const r = i * " d ", col = i * " m ";\n"
                     body "\n  }")

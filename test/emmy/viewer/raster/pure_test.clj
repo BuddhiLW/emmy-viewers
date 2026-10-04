@@ -50,7 +50,7 @@
   (doseq [[convention state-shape shape snippet]
           [[:native [0 1] [[0 1] 2] "fb(xs[r], xs[r + 1])"]
            [:structure [[0 1] 2] [0 1] "fb([[xs[r], xs[r + 1]], xs[r + 2]], ps)"]
-           [:primitive [0 1] [0 1] "fb(row, out.subarray(col, col + 2), ps)"]]]
+           [:primitive [0 1] [0 1] "fb(row, res, ps)"]]]
     (let [src (adapter/adapter-source {:convention convention
                                        :state (vec (range (count (flatten state-shape))))
                                        :state-shape state-shape
