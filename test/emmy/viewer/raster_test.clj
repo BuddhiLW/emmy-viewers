@@ -38,8 +38,7 @@
     ok))
 
 (defn- run-node
-  "Evaluates the bound `form` and its `:js` fallback in node on every argument
-  list in `cases`, returning readiness, dimensions, and per-point/batch outputs.
+  "Evaluates a compiled kernel form and its Emmy function in node on all cases.
   A :primitive function returns the array it wrote, of length `n-out`."
   [form convention n-out cases]
   (let [[[_ _ glue] [_ & fb]] form
@@ -60,11 +59,17 @@
                        "  return Array.from(f.batch(flat(args[0]), 1, args[1]));\n")
                      "};\n"
                      "const cases = " (json/write-str cases) ";\n"
-                     "console.log(JSON.stringify({wasm: f.wasm(), ready: f.ready(), dims: f.dims,"
+                     "const inputs = cases.flatMap((c) => flat(" (if (= convention :native) "c" "c[0]") "));\n"
+                     "const ps = " (if (= convention :native) "null" "cases[0][1]") ";\n"
+                     "const buffer = new Float64Array(cases.length * " n-out ");\n"
+                     "const returned = f.batch(new Float64Array(inputs), cases.length, ps, buffer);\n"
+                     "const many = Array.from(buffer);\n"
+                     "const plain = Array.from(f.batch(inputs, cases.length, ps));\n"
+                     "console.log(JSON.stringify({wasm: typeof f.wasm === 'function' ? f.wasm() : null, ready: f.ready(), dims: f.dims, same: f === fb, sameOut: returned === buffer,"
                      " raster: cases.map((c) => run(f, c)),"
                      " js: cases.map((c) => run(fb, c)),"
-                     " batch: cases.map(batch)}));\n")
-        file    (java.io.File/createTempFile "raster-backend" ".js")]
+                     " batch: cases.map(batch), many, plain}));\n")
+        file (java.io.File/createTempFile "raster-backend" ".js")]
     (spit file program)
     (let [{:keys [exit out err]} (sh/sh "node" (str file))]
       (io/delete-file file true)
@@ -84,19 +89,22 @@
          (every? true? (map close? a b)))))
 
 (defn- check
-  "Compiles `f` with the raster backend, runs it on `cases` in node, and checks
-  that the wasm kernel loaded, readiness and dimensions agree with the plan,
-  that it agrees with the `:js` function (or with `expected`, a fn of the case
-  evaluated by Emmy on the JVM), and that batch agrees with per-point calls."
+  "Compiles `f` with both backends, runs each on `cases` in node, and checks
+  readiness, dimensions, per-point and batch parity. Raster is also compared
+  against `expected` where Emmy's JS renderer differs (notably atan2)."
   ([f params initial-state opts cases]
    (check f params initial-state opts cases nil))
   ([f params initial-state opts cases expected]
-   (let [form  (binding [vc/*backend* :raster]
-                 (vc/compiled-fn f params initial-state opts))
-         p     (plan/plan f params initial-state opts)
-         conv  (:calling-convention opts :structure)
+   (let [form (binding [vc/*backend* :raster]
+                (vc/compiled-fn f params initial-state opts))
+         p (plan/plan f params initial-state opts)
+         conv (:calling-convention opts :structure)
          n-out (count (:outputs p))
-         {:keys [wasm ready dims raster js batch]} (run-node form conv n-out cases)]
+         {:keys [wasm ready dims raster js batch]} (run-node form conv n-out cases)
+         jplan (plan/plan f params initial-state (assoc opts :simplify? false))
+         jresult (run-node (binding [vc/*backend* :js]
+                             (vc/compiled-fn f params initial-state opts))
+                           conv (count (:outputs jplan)) cases)]
      (is (true? wasm) "the kernel loaded synchronously")
      (is (= wasm ready) "ready reports the same loaded state as wasm")
      (is (= {:state (count (:state p))
@@ -107,7 +115,51 @@
              :let [want (if expected (expected c) j)]]
        (is (close? r want) (str "case " (pr-str c) ": raster " r ", expected " want))
        (is (close? (flatten (if (number? r) [r] r)) b)
-           (str "case " (pr-str c) ": batch " b ", per point " r))))))
+           (str "case " (pr-str c) ": batch " b ", per point " r)))
+     (is (true? (:same jresult)) "the JS kernel is Emmy's function itself")
+     (is (true? (:ready jresult)))
+     (is (= {:state (count (:state jplan))
+             :outputs (count (:outputs jplan))
+             :params (count (:params jplan))} (:dims jresult)))
+     (doseq [[j b] (map vector (:raster jresult) (:batch jresult))]
+       (is (close? (flatten (if (number? j) [j] j)) b)
+           "JS batch agrees with per-point on a plain array"))
+     (when (or (= conv :native) (<= (count (distinct (map second cases))) 1))
+       (is (close? (mapcat #(flatten (if (number? %) [%] %)) (:raster jresult))
+                   (:many jresult))
+           "JS batch agrees with per-point across typed rows")))))
+
+(deftest js-backend-test
+  (when node?
+    (doseq [[label f params initial-state opts cases]
+            [["native scalar" (fn [x] (e/* x (e/sin x))) false [0]
+              {:calling-convention :native :arity 1} [[0.0] [1.0] [-2.5]]]
+             ["native nested output" (fn [x] (e/up (e/up x (e/square x)) (e/sin x))) false [0]
+              {:calling-convention :native :arity 1} [[0.0] [1.0] [-2.5]]]
+             ["structure with params" (fn [a] (fn [[x y]] (e/up (e/* a x) (e/+ x y))))
+              '[a] [0 0] {} [[[1.0 2.0] [3.0]] [[-2.0 4.0] [3.0]]]]
+             ["nested structure state" (fn [[xy z]] (e/up (e/+ (first xy) z) (second xy)))
+              false [[0 0] 0] {} [[[[1.0 2.0] 3.0]] [[[-2.0 4.0] 5.0]]]]
+             ["primitive" (fn [[u v]] (e/up u (e/* u v))) false [0 0]
+              {:calling-convention :primitive :generic-params? false}
+              [[[1.0 2.0] nil] [[-2.0 4.0] nil]]]]]
+      (testing label
+        (let [p (plan/plan f params initial-state (assoc opts :simplify? false))
+              result (run-node (binding [vc/*backend* :js]
+                                 (vc/compiled-fn f params initial-state opts))
+                               (:convention p) (count (:outputs p)) cases)
+              {:keys [ready dims same sameOut raster js batch many plain]} result
+              want (mapcat #(flatten (if (number? %) [%] %)) raster)]
+          (is (true? same) "the adapter returns Emmy's function, not a wrapper")
+          (is (true? sameOut) "batch returns the supplied output buffer")
+          (is (true? ready))
+          (is (= {:state (count (:state p)) :outputs (count (:outputs p))
+                  :params (count (:params p))} dims))
+          (doseq [[r j b] (map vector raster js batch)]
+            (is (close? r j))
+            (is (close? (flatten (if (number? r) [r] r)) b)))
+          (is (close? want many) "typed multi-row batch agrees with per-point")
+          (is (close? want plain) "plain-array multi-row batch agrees with per-point"))))))
 
 (deftest raster-backend-test
   (when (and raster? node?)
