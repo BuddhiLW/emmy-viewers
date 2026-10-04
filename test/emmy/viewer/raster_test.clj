@@ -39,9 +39,8 @@
 
 (defn- run-node
   "Evaluates the bound `form` and its `:js` fallback in node on every argument
-  list in `cases`, and returns `{:wasm loaded? :raster [...] :js [...] :batch
-  [...]}`. A :primitive function returns the array it wrote, of length `n-out`;
-  `:batch` holds each case evaluated through `f.batch`, flattened."
+  list in `cases`, returning readiness, dimensions, and per-point/batch outputs.
+  A :primitive function returns the array it wrote, of length `n-out`."
   [form convention n-out cases]
   (let [[[_ _ glue] [_ & fb]] form
         program (str "const fb = new Function(" (json/write-str (vec (butlast fb)))
@@ -61,7 +60,7 @@
                        "  return Array.from(f.batch(flat(args[0]), 1, args[1]));\n")
                      "};\n"
                      "const cases = " (json/write-str cases) ";\n"
-                     "console.log(JSON.stringify({wasm: f.wasm(),"
+                     "console.log(JSON.stringify({wasm: f.wasm(), ready: f.ready(), dims: f.dims,"
                      " raster: cases.map((c) => run(f, c)),"
                      " js: cases.map((c) => run(fb, c)),"
                      " batch: cases.map(batch)}));\n")
@@ -86,18 +85,24 @@
 
 (defn- check
   "Compiles `f` with the raster backend, runs it on `cases` in node, and checks
-  that the wasm kernel loaded, that it agrees with the `:js` function (or with
-  `expected`, a fn of the case evaluated by Emmy on the JVM, when given), and
-  that `f.batch` agrees with the per-point calls."
+  that the wasm kernel loaded, readiness and dimensions agree with the plan,
+  that it agrees with the `:js` function (or with `expected`, a fn of the case
+  evaluated by Emmy on the JVM), and that batch agrees with per-point calls."
   ([f params initial-state opts cases]
    (check f params initial-state opts cases nil))
   ([f params initial-state opts cases expected]
    (let [form  (binding [vc/*backend* :raster]
                  (vc/compiled-fn f params initial-state opts))
+         p     (plan/plan f params initial-state opts)
          conv  (:calling-convention opts :structure)
-         n-out (count (:outputs (plan/plan f params initial-state opts)))
-         {:keys [wasm raster js batch]} (run-node form conv n-out cases)]
+         n-out (count (:outputs p))
+         {:keys [wasm ready dims raster js batch]} (run-node form conv n-out cases)]
      (is (true? wasm) "the kernel loaded synchronously")
+     (is (= wasm ready) "ready reports the same loaded state as wasm")
+     (is (= {:state (count (:state p))
+             :outputs (count (:outputs p))
+             :params (count (:params p))} dims)
+         "dimensions match the plan")
      (doseq [[c r j b] (map vector cases raster js batch)
              :let [want (if expected (expected c) j)]]
        (is (close? r want) (str "case " (pr-str c) ": raster " r ", expected " want))

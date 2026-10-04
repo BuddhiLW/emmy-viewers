@@ -144,12 +144,17 @@
   "The source of a JS function of one argument, `fb` (the same function compiled
   by Emmy's `:js` mode), that loads `module` (the plan's kernel, base64 wasm)
   and returns a function in `plan`'s calling convention. The returned function
-  answers `wasm()` with whether the kernel is loaded, and `batch(...)` evaluates
-  many points in one kernel call (see [[batch-source]])."
-  [plan module sync?]
+  answers `wasm()` and `ready()` with whether the kernel is loaded, exposes
+  `dims` (state, outputs, params), and `batch(...)` evaluates many points in
+  one kernel call (see [[batch-source]])."
+  [{:keys [state outputs params] :as plan} module sync?]
   (str/join "\n" [prelude
                   (loader module sync?)
                   (function-source plan)
                   (batch-source plan)
                   "f.wasm = () => k !== null;"
+                  "f.ready = () => k !== null;"
+                  (str "f.dims = {state: " (count state)
+                       ", outputs: " (count outputs)
+                       ", params: " (count params) "};")
                   "return f;"]))
