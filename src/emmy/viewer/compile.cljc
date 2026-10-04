@@ -107,9 +107,7 @@
     params
     [0]
     {})
-   `(let [psym# (mapv @~atom ~params)]
-      (fn [x#]
-        (~sym [x#] psym#)))])
+   `(emmy.viewer.kernel/bind-1d ~sym (mapv @~atom ~params))])
 
 (defn compile-1d
   "Takes
@@ -149,9 +147,7 @@
   See the body of [[compile-2d]] for more details."
   [sym {:keys [f params atom]}]
   [(compiled-fn f params [0 0] {})
-   `(let [psym# (mapv @~atom ~params)]
-      (fn [xy#]
-        (~sym xy# psym#)))])
+   `(emmy.viewer.kernel/bind ~sym (mapv @~atom ~params))])
 
 (defn compile-2d
   "Takes

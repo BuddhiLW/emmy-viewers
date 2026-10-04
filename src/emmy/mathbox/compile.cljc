@@ -23,6 +23,8 @@
   (let [in      (gensym)
         syms    (repeatedly dimensions gensym)
         indices (range dimensions)]
+    ;; MathBox calls (fn [emit x y z]); the primitive kernel writes to a
+    ;; reusable output array before emit, unlike bind's (state ps) call.
     `(let [~in   (~'js/Array. ~@(repeat dimensions 0))
            out#  (~'js/Array. 0 0 0)
            psym# ~(when param-f
@@ -49,6 +51,8 @@
   Returns a pair of a form that evaluates to the compiled state function (see
   [[emmy.viewer.compile/compiled-fn]]) and the output of [[frame]]."
   [sym {:keys [f params] :as param-f} dimensions simplify?]
+  ;; frame adapts the primitive (in out ps) kernel to MathBox's emit callback;
+  ;; bind only handles the structure-style (state ps) call shape.
   [(vc/compiled-fn
     f params (into [] (repeat dimensions 0))
     {:simplify? simplify?
