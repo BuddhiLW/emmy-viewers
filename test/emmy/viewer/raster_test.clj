@@ -86,19 +86,22 @@
          (every? true? (map close? a b)))))
 
 (defn- check
-  "Compiles `f` with the raster backend, runs it on `cases` in node, and checks
-  that the wasm kernel loaded, readiness and dimensions agree with the plan,
-  that it agrees with the `:js` function (or with `expected`, a fn of the case
-  evaluated by Emmy on the JVM), and that batch agrees with per-point calls."
+  "Compiles `f` with both backends, runs each on `cases` in node, and checks
+  readiness, dimensions, per-point and batch parity. Raster is also compared
+  against `expected` where Emmy's JS renderer differs (notably atan2)."
   ([f params initial-state opts cases]
    (check f params initial-state opts cases nil))
   ([f params initial-state opts cases expected]
-   (let [form  (binding [vc/*backend* :raster]
-                 (vc/compiled-fn f params initial-state opts))
-         p     (plan/plan f params initial-state opts)
-         conv  (:calling-convention opts :structure)
+   (let [form (binding [vc/*backend* :raster]
+                (vc/compiled-fn f params initial-state opts))
+         p (plan/plan f params initial-state opts)
+         conv (:calling-convention opts :structure)
          n-out (count (:outputs p))
-         {:keys [wasm ready dims raster js batch]} (run-node form conv n-out cases)]
+         {:keys [wasm ready dims raster js batch]} (run-node form conv n-out cases)
+         jplan (plan/plan f params initial-state (assoc opts :simplify? false))
+         jresult (run-node (binding [vc/*backend* :js]
+                             (vc/compiled-fn f params initial-state opts))
+                           conv (count (:outputs jplan)) cases)]
      (is (true? wasm) "the kernel loaded synchronously")
      (is (= wasm ready) "ready reports the same loaded state as wasm")
      (is (= {:state (count (:state p))
@@ -109,7 +112,19 @@
              :let [want (if expected (expected c) j)]]
        (is (close? r want) (str "case " (pr-str c) ": raster " r ", expected " want))
        (is (close? (flatten (if (number? r) [r] r)) b)
-           (str "case " (pr-str c) ": batch " b ", per point " r))))))
+           (str "case " (pr-str c) ": batch " b ", per point " r)))
+     (is (true? (:same jresult)) "the JS kernel is Emmy's function itself")
+     (is (true? (:ready jresult)))
+     (is (= {:state (count (:state jplan))
+             :outputs (count (:outputs jplan))
+             :params (count (:params jplan))} (:dims jresult)))
+     (doseq [[j b] (map vector (:raster jresult) (:batch jresult))]
+       (is (close? (flatten (if (number? j) [j] j)) b)
+           "JS batch agrees with per-point on a plain array"))
+     (when (or (= conv :native) (<= (count (distinct (map second cases))) 1))
+       (is (close? (mapcat #(flatten (if (number? %) [%] %)) (:raster jresult))
+                   (:many jresult))
+           "JS batch agrees with per-point across typed rows")))))
 
 (deftest js-backend-test
   (when node?

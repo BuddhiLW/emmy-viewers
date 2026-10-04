@@ -1,8 +1,9 @@
 (ns ^:no-doc emmy.viewer.kernel.adapter
   "Pure source generator for the JavaScript kernel contract. It consumes only the
   data of a Plan, not kernel.plan itself: that namespace is JVM-only, while
-  compile.cljc and this adapter must load in Portal's cljs build. The JVM
-  backend builds the plan; cljs callers can pass the same plain data."
+  compile.cljc and this adapter must load in Portal's cljs build. On cljs,
+  cljs-plan derives the same shape and dimensions from symbolic application,
+  without requiring the JVM namespace or simplifying."
   (:require [clojure.string :as str]
             [emmy.structure :as s]))
 
@@ -23,9 +24,9 @@
                        (if (tree? y) (mapv walk y) (vswap! i inc))) x))))
         i (volatile! -1)
         state ((fn walk [x]
-                 (if (tree? x)
-                   (mapv walk x)
-                   (symbol (str "s" (vswap! i inc))))) initial-state)
+                 (cond (vector? x) (mapv walk x)
+                       (s/structure? x) (s/mapr (fn [_] (symbol (str "s" (vswap! i inc)))) x)
+                       :else (symbol (str "s" (vswap! i inc))))) initial-state)
         ps (when (and params generic-params?)
              (mapv #(symbol (str "p" %)) (range (count params))))
         g (cond (false? params) f
