@@ -94,3 +94,20 @@
   "Fix ps in k and accept a scalar x as a one-element state. Preserve the kernel's batch contract."
   [k ps]
   (forward-contract! (fn [x] (k [x] ps)) k ps))
+
+(defn area-expr
+  "A MathBox Area expr for `f`, a function of a two-coordinate input `[a b]`
+  whose value `place` puts into 3D, as `(place emit a b v)`.
+
+  A kernel with both ranges known samples its whole grid with one batch call
+  per update (see [[batched-area-expr]]); anything else is called once per
+  sample, with `in` (a two-element JS array) reused as its input."
+  [f {:keys [x-range y-range width height place in]}]
+  (if (and (kernel? f) x-range y-range)
+    (batched-area-expr f nil {:x-range x-range :y-range y-range
+                              :width (or width 64) :height (or height 64)
+                              :input vector :emit place})
+    (fn [emit a b _i _j _time]
+      (aset in 0 a)
+      (aset in 1 b)
+      (place emit a b (f in)))))

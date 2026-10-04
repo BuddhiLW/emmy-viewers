@@ -1228,7 +1228,7 @@
   [_]
   (let [in #js [0 0]]
     (fn [{:keys [z] :as opts}]
-      (let [expr (if (and (kernel/kernel? z) (:x-range opts) (:y-range opts)) (kernel/batched-area-expr z nil {:x-range (:x-range opts), :y-range (:y-range opts), :width (:x-samples opts 64), :height (:y-samples opts 64), :input vector, :emit (fn [emit x y v] (emit x y v))}) (fn [emit x y _i _j _time] (aset in 0 x) (aset in 1 y) (emit x y (z in))))]
+      (let [expr (kernel/area-expr z {:x-range (:x-range opts), :y-range (:y-range opts), :width (:x-samples opts), :height (:y-samples opts), :in in, :place (fn [emit x y v] (emit x y v))})]
         [Surface2D
          (-> (dissoc opts :z)
              (cs/rename-keys {:x-range :u-range
@@ -1291,7 +1291,7 @@
   [_]
   (let [in #js [0 0]]
     (fn [{:keys [y] :as opts}]
-      (let [expr (if (and (kernel/kernel? y) (:x-range opts) (:z-range opts)) (kernel/batched-area-expr y nil {:x-range (:x-range opts), :y-range (:z-range opts), :width (:x-samples opts 64), :height (:z-samples opts 64), :input vector, :emit (fn [emit x z v] (emit x v z))}) (fn [emit x z _i _j _time] (aset in 0 x) (aset in 1 z) (emit x (y in) z)))]
+      (let [expr (kernel/area-expr y {:x-range (:x-range opts), :y-range (:z-range opts), :width (:x-samples opts), :height (:z-samples opts), :in in, :place (fn [emit x z v] (emit x v z))})]
         [Surface2D
          (-> (dissoc opts :y)
              (cs/rename-keys {:x-range :u-range
@@ -1354,7 +1354,7 @@
   [_]
   (let [in #js [0 0]]
     (fn [{:keys [x] :as opts}]
-      (let [expr (if (and (kernel/kernel? x) (:y-range opts) (:z-range opts)) (kernel/batched-area-expr x nil {:x-range (:y-range opts), :y-range (:z-range opts), :width (:y-samples opts 64), :height (:z-samples opts 64), :input vector, :emit (fn [emit y z v] (emit v y z))}) (fn [emit y z _i _j _time] (aset in 0 y) (aset in 1 z) (emit (x in) y z)))]
+      (let [expr (kernel/area-expr x {:x-range (:y-range opts), :y-range (:z-range opts), :width (:y-samples opts), :height (:z-samples opts), :in in, :place (fn [emit y z v] (emit v y z))})]
         [Surface2D
          (-> (dissoc opts :x)
              (cs/rename-keys {:y-range :u-range
