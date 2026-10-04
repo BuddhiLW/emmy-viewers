@@ -40,6 +40,53 @@
                     (fn [[x]] (inner x))))))
       (fn [[t]] (f t)))))
 
+;; ## Computational Backends
+
+(def ^:dynamic *backend*
+  "The computational backend that compiles Emmy functions for the viewers:
+
+  - `:js` (default): JavaScript source, from Emmy's `:js` compile mode.
+  - `:raster`: WebAssembly, compiled by raster on the JVM. Needs raster on the
+    classpath; see [[emmy.viewer.raster]].
+
+  Bind it around the code that builds a viewer:
+
+  ```clojure
+  (binding [emmy.viewer.compile/*backend* :raster]
+    (emmy.mafs/of-x sin))
+  ```"
+  :js)
+
+(defmulti compiled-fn*
+  "Backend implementation of [[compiled-fn]], dispatched on the backend
+  keyword."
+  (fn [backend _f _params _initial-state _opts] backend))
+
+(defn compiled-fn
+  "Returns a form that evaluates, in the browser, to `f` compiled by
+  [[*backend*]].
+
+  The arguments are those of [[emmy.expression.compile/compile-state-fn]], minus
+  `:mode`, and the compiled function has the same calling convention whichever
+  backend compiles it."
+  [f params initial-state opts]
+  (compiled-fn* *backend* f params initial-state opts))
+
+(defmethod compiled-fn* :js [_ f params initial-state opts]
+  (list* 'js/Function.
+         (xc/compile-state-fn f params initial-state (assoc opts :mode :js))))
+
+#?(:clj
+   (defmethod compiled-fn* :raster [_ f params initial-state opts]
+     ((requiring-resolve 'emmy.viewer.raster/compiled-fn)
+      f params initial-state opts)))
+
+(defmethod compiled-fn* :default [backend & _]
+  (throw
+   (ex-info (str "Unknown compile backend " (pr-str backend)
+                 "; known: " (pr-str (keys (methods compiled-fn*))))
+            {:backend backend})))
+
 ;; ## Compile Functions
 
 (defn param-1d
@@ -50,18 +97,18 @@
 
   and returns a pair of
 
-  - a function body of the form `(js/Function. ...)`
+  - a form that evaluates to the compiled function (see [[compiled-fn]])
   - the NEW quoted form that should be passed along.
 
   See the body of [[compile-1d]] for more details."
   [sym {:keys [f params atom]}]
-  [(xc/compile-state-fn
+  [(compiled-fn
     (fn [& params]
       (let [inner (apply f params)]
         (fn [[x]] (inner x))))
     params
     [0]
-    {:mode :js})
+    {})
    `(let [psym# (mapv @~atom ~params)]
       (fn [x#]
         (~sym [x#] psym#)))])
@@ -81,10 +128,12 @@
     (if-not (compile? v)
       [[] opts]
       (let [sym          (gensym)
-            [body new-f] (if (v/param-f? v)
+            [form new-f] (if (v/param-f? v)
                            (param-1d sym v)
-                           [(xc/compile-fn v 1 {:mode :js}) sym])]
-        [[sym (list* 'js/Function. body)]
+                           [(compiled-fn v false [0] {:calling-convention :native
+                                                      :arity 1})
+                            sym])]
+        [[sym form]
          (assoc opts k new-f)]))))
 
 (defn param-2d
@@ -96,12 +145,12 @@
 
   and returns a pair of
 
-  - a function body of the form `(js/Function. ...)`
+  - a form that evaluates to the compiled function (see [[compiled-fn]])
   - the NEW quoted form that should be passed along.
 
   See the body of [[compile-2d]] for more details."
   [sym {:keys [f params atom]}]
-  [(xc/compile-state-fn f params [0 0] {:mode :js})
+  [(compiled-fn f params [0 0] {})
    `(let [psym# (mapv @~atom ~params)]
       (fn [xy#]
         (~sym xy# psym#)))])
@@ -122,10 +171,10 @@
     (if-not (compile? v)
       [[] opts]
       (let [sym          (gensym)
-            [body new-f] (if (v/param-f? v)
+            [form new-f] (if (v/param-f? v)
                            (param-2d sym v)
-                           [(xc/compile-state-fn v false [0 0] {:mode :js}) sym])]
-        [[sym (list* 'js/Function. body)]
+                           [(compiled-fn v false [0 0] {}) sym])]
+        [[sym form]
          (assoc opts k new-f)]))))
 
 (defn wrap

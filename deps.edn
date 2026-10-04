@@ -36,6 +36,18 @@
    {thheller/shadow-cljs {:mvn/version "2.25.2"}
     org.clojure/clojurescript {:mvn/version "1.11.60"}}}
 
+  ;; Opt-in computational backend: Emmy functions compiled to WebAssembly by
+  ;; raster (see `emmy.viewer.raster`). Its tests run the emitted modules in
+  ;; node, and skip without it.
+  ;;
+  ;;   clojure -M:test:raster:runner
+  :raster
+  {:extra-deps
+   {io.github.replikativ/raster {:git/tag "v0.2.258" :git/sha "d0fb8f7"}
+    org.typedclojure/typed.clj.runtime {:mvn/version "1.4.0"}}
+   :jvm-opts ["--enable-native-access=ALL-UNNAMED"
+              "--add-modules=jdk.incubator.vector"]}
+
   :test
   ;; layer this in to get access to everything in the test directory, plus the
   ;; dependencies needed to run the tests.

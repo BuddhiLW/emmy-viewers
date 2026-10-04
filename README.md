@@ -296,6 +296,39 @@ through ["Demos"](#demos) for inspiration.
 [MathLive.cljs](https://github.com/mentat-collective/jsxgraph.cljs) guides are
 coming soon.
 
+## Computational Backends
+
+Every function a viewer plots is compiled on the JVM before it reaches the
+browser. The backend that compiles it is chosen by
+`emmy.viewer.compile/*backend*`:
+
+- `:js` (the default) emits JavaScript source through Emmy's `:js` compile mode.
+- `:raster` compiles each output of the function to an import-free WebAssembly
+  module with [raster](https://github.com/replikativ/raster). Emmy still
+  simplifies the function symbolically first; the modules ship inside the
+  fragment and keep the `:js` calling convention, so no viewer changes.
+
+```clojure
+(require '[emmy.viewer.compile :as vc])
+
+(binding [vc/*backend* :raster]
+  (emmy.mafs/of-x (fn [x] (* x (sin x)))))
+```
+
+The raster backend needs raster on the classpath (the `:raster` alias). Things
+to know:
+
+- raster's wasm math approximates the transcendental functions: `sin`/`cos`
+  within 5e-6 and `atan`/`asin`/`acos` within 3e-5 of `java.lang.Math`. Plots
+  cannot show the difference; long ODE integrations can drift from the `:js`
+  result.
+- A function raster cannot compile (a literal function, an operator outside its
+  vocabulary) throws at build time and names the form. Bind `:js` for that
+  viewer.
+- Each fragment also carries the `:js` function. A browser without WebAssembly
+  uses it, and so does any call made while a module larger than 4 KB is still
+  compiling asynchronously.
+
 ## Demos
 
 These demos are in-progress, more advanced demonstrations of the capabilities of

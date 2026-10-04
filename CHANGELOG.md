@@ -2,6 +2,16 @@
 
 ## [unreleased]
 
+- Adds computational backends. Every compile site (`compile-1d`, `compile-2d`,
+  MathBox's `compile-3d`, physics' `ode-compile`) now goes through
+  `emmy.viewer.compile/compiled-fn`, an open multimethod on
+  `emmy.viewer.compile/*backend*`. `:js` is the default and emits the same
+  forms as before.
+
+- Adds the `:raster` backend (`emmy.viewer.raster`, `:raster` alias): Emmy
+  functions compiled to WebAssembly by raster, with the `:js` function as a
+  fallback.
+
 ## [0.3.2]
 
 - #80 bumps the Mafs.cljs and Mafs dependencies to Mafs 0.18.8, fixing #78.
