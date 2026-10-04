@@ -10,7 +10,8 @@
             [emmy.viewer.raster.glue :as glue]
             [emmy.viewer.raster.lower :as lower]
             [emmy.viewer.kernel.plan :as plan]
-            [emmy.viewer.kernel.backend :as backend]))
+            [emmy.viewer.kernel.backend :as backend]
+            [emmy.viewer.kernel.adapter :as adapter]))
 
 (deftest lower-test
   (testing "integer powers become products, so a negative base stays defined"
@@ -44,6 +45,20 @@
   (is (= [0 1] (plan/shape (e/up 'a 'b))))
   (is (= [[0 1] 2] (plan/shape (e/up (e/up 'a 'b) 'c))))
   (is (= '[a b c] (plan/leaves (e/up (e/up 'a 'b) 'c)))))
+
+(deftest adapter-source-test
+  (doseq [[convention state-shape shape snippet]
+          [[:native [0 1] [[0 1] 2] "fb(xs[r], xs[r + 1])"]
+           [:structure [[0 1] 2] [0 1] "fb([[xs[r], xs[r + 1]], xs[r + 2]], ps)"]
+           [:primitive [0 1] [0 1] "fb(row, out.subarray(col, col + 2), ps)"]]]
+    (let [src (adapter/adapter-source {:convention convention
+                                       :state (vec (range (count (flatten state-shape))))
+                                       :state-shape state-shape
+                                       :outputs (vec (range (count (flatten shape))))
+                                       :params '[p0] :shape shape})]
+      (is (str/includes? src snippet))
+      (is (str/includes? src "fb.ready = () => true;"))
+      (is (str/includes? src "return fb;")))))
 
 (deftest plan-test
   (testing "native calling convention, one argument"
@@ -139,15 +154,16 @@
     [:custom f params initial-state opts]))
 
 (deftest backend-test
-  (let [f (fn [x] (e/* x (e/sin x)))]
-    (testing ":js is the default and emits Emmy's js/Function call"
+  (let [f (fn [x] (e/* x (e/sin x)))
+        opts {:calling-convention :native :arity 1}]
+    (testing ":js decorates the original Emmy function without changing its source"
       (is (= :js vc/*backend*))
-      (is (= (list* 'js/Function.
-                    (xc/compile-state-fn f false [0] {:calling-convention :native
-                                                      :arity 1
-                                                      :mode :js}))
-             (vc/compiled-fn f false [0] {:calling-convention :native
-                                          :arity 1}))))
+      (let [form (vc/compiled-fn f false [0] opts)]
+        (is (= 'js/Function. (ffirst form)))
+        (is (= "fb" (second (first form))))
+        (is (= (list* 'js/Function.
+                     (xc/compile-state-fn f false [0] (assoc opts :mode :js)))
+               (second form)))))
     (testing "a backend value substitutes without registration"
       (let [b (->TestBackend)]
         (is (identical? b (backend/resolve-backend b)))

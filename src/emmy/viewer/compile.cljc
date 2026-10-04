@@ -5,7 +5,9 @@
   See [[emmy.mafs.plot]] and [[emmy.mathbox.plot]] for example uses."
   (:require [emmy.expression.compile :as xc]
             [emmy.viewer :as v]
-            [emmy.viewer.kernel.backend :as backend]))
+            [emmy.viewer.kernel.backend :as backend]
+            [emmy.viewer.kernel.adapter :as adapter]
+            #?(:clj [emmy.viewer.kernel.plan :as plan])))
 
 (defn compile?
   "Returns true if `f` is an argument that should be compiled by Emmy, false
@@ -63,8 +65,12 @@
 (defrecord JsBackend []
   backend/KernelBackend
   (kernel-form [_ f params initial-state opts]
-    (list* 'js/Function.
-           (xc/compile-state-fn f params initial-state (assoc opts :mode :js)))))
+    (let [p #?(:clj (plan/plan f params initial-state
+                               (assoc opts :simplify? false))
+               :cljs (adapter/cljs-plan f params initial-state opts))]
+      (list (list 'js/Function. "fb" (adapter/adapter-source p))
+            (list* 'js/Function.
+                   (xc/compile-state-fn f params initial-state (assoc opts :mode :js)))))))
 
 (defn compiled-fn
   "Returns a form that evaluates, in the browser, to `f` compiled by

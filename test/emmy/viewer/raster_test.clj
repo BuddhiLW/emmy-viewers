@@ -38,8 +38,7 @@
     ok))
 
 (defn- run-node
-  "Evaluates the bound `form` and its `:js` fallback in node on every argument
-  list in `cases`, returning readiness, dimensions, and per-point/batch outputs.
+  "Evaluates a compiled kernel form and its Emmy function in node on all cases.
   A :primitive function returns the array it wrote, of length `n-out`."
   [form convention n-out cases]
   (let [[[_ _ glue] [_ & fb]] form
@@ -60,11 +59,14 @@
                        "  return Array.from(f.batch(flat(args[0]), 1, args[1]));\n")
                      "};\n"
                      "const cases = " (json/write-str cases) ";\n"
-                     "console.log(JSON.stringify({wasm: f.wasm(), ready: f.ready(), dims: f.dims,"
+                     "const inputs = cases.flatMap((c) => flat(" (if (= convention :native) "c" "c[0]") "));\n"
+                     "const many = Array.from(f.batch(new Float64Array(inputs), cases.length, "
+                     (if (= convention :native) "null" "cases[0][1]") "));\n"
+                     "console.log(JSON.stringify({wasm: typeof f.wasm === 'function' ? f.wasm() : null, ready: f.ready(), dims: f.dims, same: f === fb,"
                      " raster: cases.map((c) => run(f, c)),"
                      " js: cases.map((c) => run(fb, c)),"
-                     " batch: cases.map(batch)}));\n")
-        file    (java.io.File/createTempFile "raster-backend" ".js")]
+                     " batch: cases.map(batch), many}));\n")
+        file (java.io.File/createTempFile "raster-backend" ".js")]
     (spit file program)
     (let [{:keys [exit out err]} (sh/sh "node" (str file))]
       (io/delete-file file true)
@@ -108,6 +110,36 @@
        (is (close? r want) (str "case " (pr-str c) ": raster " r ", expected " want))
        (is (close? (flatten (if (number? r) [r] r)) b)
            (str "case " (pr-str c) ": batch " b ", per point " r))))))
+
+(deftest js-backend-test
+  (when node?
+    (doseq [[label f params initial-state opts cases]
+            [["native scalar" (fn [x] (e/* x (e/sin x))) false [0]
+              {:calling-convention :native :arity 1} [[0.0] [1.0] [-2.5]]]
+             ["native nested output" (fn [x] (e/up (e/up x (e/square x)) (e/sin x))) false [0]
+              {:calling-convention :native :arity 1} [[0.0] [1.0] [-2.5]]]
+             ["structure with params" (fn [a] (fn [[x y]] (e/up (e/* a x) (e/+ x y))))
+              '[a] [0 0] {} [[[1.0 2.0] [3.0]] [[-2.0 4.0] [3.0]]]]
+             ["nested structure state" (fn [[xy z]] (e/up (e/+ (first xy) z) (second xy)))
+              false [[0 0] 0] {} [[[[1.0 2.0] 3.0]] [[[-2.0 4.0] 5.0]]]]
+             ["primitive" (fn [[u v]] (e/up u (e/* u v))) false [0 0]
+              {:calling-convention :primitive :generic-params? false}
+              [[[1.0 2.0] nil] [[-2.0 4.0] nil]]]]]
+      (testing label
+        (let [p (plan/plan f params initial-state (assoc opts :simplify? false))
+              result (run-node (binding [vc/*backend* :js]
+                                 (vc/compiled-fn f params initial-state opts))
+                               (:convention p) (count (:outputs p)) cases)
+              {:keys [ready dims same raster js batch many]} result]
+          (is (true? same) "the adapter returns Emmy's function, not a wrapper")
+          (is (true? ready))
+          (is (= {:state (count (:state p)) :outputs (count (:outputs p))
+                  :params (count (:params p))} dims))
+          (doseq [[r j b] (map vector raster js batch)]
+            (is (close? r j))
+            (is (close? (flatten (if (number? r) [r] r)) b)))
+          (is (close? (mapcat #(flatten (if (number? %) [%] %)) raster) many)
+              "typed multi-row batch agrees with all per-point calls"))))))
 
 (deftest raster-backend-test
   (when (and raster? node?)
