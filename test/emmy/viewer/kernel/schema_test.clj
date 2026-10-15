@@ -6,7 +6,7 @@
             [emmy.viewer.kernel.plan :as plan]))
 
 (def ^:private malli?
-  (try (require 'emmy.viewer.kernel.schema 'malli.core)
+  (try (require 'malli.core 'emmy.viewer.kernel.schema)
        true
        (catch java.io.FileNotFoundException _
          (when (System/getenv "EMMY_VIEWERS_REQUIRE_RASTER")

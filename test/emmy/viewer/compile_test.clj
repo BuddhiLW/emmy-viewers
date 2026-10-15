@@ -21,13 +21,18 @@
            (second (vc/param-2d 'compiled (param-2d)))))))
 
 (deftest parameter-bindings-compile-test
-  (doseq [backend [:js :raster]]
-    (testing (str backend " compiles parameter-bound 1d and 2d kernels")
-      (binding [vc/*backend* backend]
-        (doseq [[compile-fn param-f] [[vc/compile-1d (param-1d)]
-                                     [vc/compile-2d (param-2d)]]]
-          (let [[[sym form] opts] (compile-fn {:f param-f} :f)]
-            (is (symbol? sym))
-            (is (seq? form))
-            (is (= 'js/Function. (ffirst form)))
-            (is (seq? (:f opts)))))))))
+  (let [raster? (try (require 'emmy.viewer.raster)
+                     true
+                     (catch Exception _
+                       (println "[compile-test] raster not on the classpath (use -M:test:raster); skipping the :raster backend")
+                       false))]
+    (doseq [backend (cond-> [:js] raster? (conj :raster))]
+      (testing (str backend " compiles parameter-bound 1d and 2d kernels")
+        (binding [vc/*backend* backend]
+          (doseq [[compile-fn param-f] [[vc/compile-1d (param-1d)]
+                                       [vc/compile-2d (param-2d)]]]
+            (let [[[sym form] opts] (compile-fn {:f param-f} :f)]
+              (is (symbol? sym))
+              (is (seq? form))
+              (is (= 'js/Function. (ffirst form)))
+              (is (seq? (:f opts))))))))))
