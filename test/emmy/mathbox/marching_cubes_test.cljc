@@ -173,9 +173,10 @@
 
 (defspec plane-vertices-are-exact 25
   (prop/for-all [[a b c] (gen/vector (gen-double 0.1 1.0) 3)
-                 level   (gen-double -0.5 0.5)]
-    (let [f    (fn [x y z] (+ (* a x) (* b y) (* c z)))
-          mesh (mc/isosurface f {:level level :samples 6})]
+                 t       (gen-double -0.5 0.5)]
+    (let [f     (fn [x y z] (+ (* a x) (* b y) (* c z)))
+          level (* t (+ a b c))
+          mesh  (mc/isosurface f {:level level :samples 6})]
       (boolean
        (and (seq (:triangles mesh))
             (every? (fn [[x y z]] (< (abs* (- (f x y z) level)) 1e-9))
