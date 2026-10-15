@@ -85,6 +85,9 @@
   functions, constants, lists and literal function application.
   `emmy.mathlive/mathjson->expression` exposes it, and
   `dev/emmy_viewers/mathlive.clj` demonstrates it.
+- Adds a Foucault pendulum example at `examples.simulation.foucault`, which
+  derives the motion from a rotating-frame Lagrangian and checks the simulated
+  precession rate against $\Omega \sin \varphi$.
 
 ## [0.3.2]
 
