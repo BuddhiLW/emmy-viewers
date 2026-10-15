@@ -15,16 +15,19 @@
         (tree-seq coll? seq form)))
 
 (deftest polar-curve-test
-  (testing "compiles `:r` to a js/Function bound by reagent's with-let"
+  (testing "compiles `:r` to a kernel bound by reagent's with-let"
     (let [frag (plot/polar-curve
                 {:r (fn [theta] (e/* 2 (e/cos theta)))
                  :color "red"
                  :range [0 Math/PI]})
-          [op [sym ctor] [component opts]] frag]
+          [op [sym ctor] [component opts]] frag
+          [attach compiled] ctor]
       (is (= 'reagent.core/with-let op))
       (is (symbol? sym))
-      (is (= 'js/Function. (first ctor)))
-      (is (re-find #"Math\.cos" (last ctor))
+      (is (= 'js/Function. (first attach))
+          "the kernel adapter is applied to the compiled function.")
+      (is (= 'js/Function. (first compiled)))
+      (is (re-find #"Math\.cos" (last compiled))
           "the compiled body evaluates the radius function.")
       (is (= 'emmy.mathbox.components.plot/PolarCurve component))
       (is (= {:r sym :color "red" :range [0 Math/PI]} opts)
