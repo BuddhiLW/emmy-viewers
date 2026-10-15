@@ -88,6 +88,10 @@
 - Adds a Foucault pendulum example at `examples.simulation.foucault`, which
   derives the motion from a rotating-frame Lagrangian and checks the simulated
   precession rate against $\Omega \sin \varphi$.
+- Adds `examples.minimal-bezier`, a notebook that finds the cubic Bézier
+  curves closest to paths of stationary action (shortest path and
+  brachistochrone) by minimizing the action over their control points, with an
+  interactive Mafs demo of draggable control points. Supersedes #23.
 
 ## [0.3.2]
 
