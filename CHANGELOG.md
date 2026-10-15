@@ -2,6 +2,15 @@
 
 ## [unreleased]
 
+## [0.4.0-fork.1]
+
+Released from the BuddhiLW/emmy-viewers fork so the changes below can be used
+before they land upstream. Each entry is an open pull request against
+mentat-collective/emmy-viewers; the fork returns to upstream releases once
+they merge.
+
+- #83 (computational backends, with raster WebAssembly as the second one):
+
 - Adds the Kernel contract to every compile site (`compile-1d`, `compile-2d`,
   MathBox's `compile-3d`, physics' `ode-compile`) via
   `emmy.viewer.compile/compiled-fn`. `emmy.viewer.kernel.backend/KernelBackend`
