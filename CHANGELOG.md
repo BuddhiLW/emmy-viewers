@@ -20,7 +20,11 @@
 
 - Adds shared malli contracts in `emmy.viewer.kernel.schema` for the Plan,
   convention, dimensions, and open backend domain.
-- Supersedes #75:
+
+- #84 moves CI to current GitHub Actions and JDK 25, and bumps Clerk to
+  v0.17.1102 so notebooks and the static build load on JDK 25.
+
+- #91, superseding #75 (TeX rendering):
 
   - Fixes `emmy.clerk/->TeX`, which simplified the expression only when
     `:simplify?` was falsy. It now simplifies only when `:simplify?` is true.
@@ -34,7 +38,8 @@
     TeX-wrapped value from `emmy.env/->TeX`.
 
   - Adds a TeX rendering example at `dev/examples/tex.clj`.
-- Adds per-vertex color support for MathBox surfaces (`of-xy`, `of-xz`,
+
+- #89, superseding #65: adds per-vertex color support for MathBox surfaces (`of-xy`, `of-xz`,
   `of-yz`, `polar-surface` and `parametric-surface`, plus their
   `emmy.mathbox.components.plot` components):
 
@@ -54,7 +59,8 @@
     `:color-fn` is set.
 
   - Adds the `examples.mathbox.color-test` notebook.
-- #51 (finished in a superseding PR):
+
+- #85, superseding #51 (polar curves):
 
   - Documents `emmy.mathbox.plot/polar-curve`, which plots a radius `:r` as a
     function of `theta` into the `z = 0` plane, and fixes the
@@ -64,7 +70,8 @@
 
   - Adds the `examples.mathbox.polar` notebook and CLJ tests for
     `polar-curve`.
-- Implicit surface plotting, finishing #58 by @vnredmon:
+
+- #87, superseding #58 by @vnredmon (implicit surface plotting):
 
   - Adds `emmy.mathbox.plot/implicit-surface` and the backing
     `emmy.mathbox.components.plot/ImplicitSurface` component. Together they plot
@@ -79,19 +86,22 @@
 
   - Adds the `examples.mathbox.implicit` notebook with a sphere, a torus, and a
     parametrized "tangle cube" whose level is driven by a Leva slider.
-- Supersedes #36: adds `emmy.mathlive.interpreter`, which converts MathLive's
+
+- #86, superseding #36: adds `emmy.mathlive.interpreter`, which converts MathLive's
   [MathJSON](https://cortexjs.io/math-json/) into Emmy expressions. Covers
   arithmetic, powers, roots, logarithms, trigonometric, hyperbolic and inverse
   functions, constants, lists and literal function application.
   `emmy.mathlive/mathjson->expression` exposes it, and
   `dev/emmy_viewers/mathlive.clj` demonstrates it.
-- Adds a Foucault pendulum example at `examples.simulation.foucault`, which
+
+- #90, superseding #64: adds a Foucault pendulum example at `examples.simulation.foucault`, which
   derives the motion from a rotating-frame Lagrangian and checks the simulated
   precession rate against $\Omega \sin \varphi$.
-- Adds `examples.minimal-bezier`, a notebook that finds the cubic Bézier
+
+- #88, superseding #23: adds `examples.minimal-bezier`, a notebook that finds the cubic Bézier
   curves closest to paths of stationary action (shortest path and
   brachistochrone) by minimizing the action over their control points, with an
-  interactive Mafs demo of draggable control points. Supersedes #23.
+  interactive Mafs demo of draggable control points.
 
 ## [0.3.2]
 
