@@ -34,6 +34,26 @@
     TeX-wrapped value from `emmy.env/->TeX`.
 
   - Adds a TeX rendering example at `dev/examples/tex.clj`.
+- Adds per-vertex color support for MathBox surfaces (`of-xy`, `of-xz`,
+  `of-yz`, `polar-surface` and `parametric-surface`, plus their
+  `emmy.mathbox.components.plot` components):
+
+  - `:color-fn` takes `[x y z u v]` and returns a number; it is compiled
+    like the surface function and may be wrapped with
+    `emmy.viewer/with-params`.
+
+  - `:color-map` picks `:rainbow` (default), `:temperature`, `:bluered` or a
+    custom `(fn [frac] [r g b])`.
+
+  - `:color-range` sets the `:color-fn` output range mapped onto the color
+    map, clamping values outside it. Defaults to `[0 1]`.
+
+  - `emmy.mathbox.color` is now a `cljc` namespace with `color-maps`,
+    `hsl->rgb`, `normalize` and `vertex-color-expr`. Default surface grid
+    lines are now `:color` darkened halfway toward black, and gray when
+    `:color-fn` is set.
+
+  - Adds the `examples.mathbox.color-test` notebook.
 
 ## [0.3.2]
 
