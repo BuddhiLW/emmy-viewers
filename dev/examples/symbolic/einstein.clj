@@ -7,7 +7,10 @@
   (:require [emmy.calculus.form-field :as ff]
             [emmy.calculus.indexed :as ci]
             [emmy.calculus.vector-field :as vf]
-            [emmy.env :as e :refer :all]))
+            ;; `spacetime-sphere` and `phi` are excluded because
+            ;; `define-coordinates` below defines its own. Clerk's analyzer
+            ;; refuses a `def` over a referred var.
+            [emmy.env :as e :refer :all :exclude [spacetime-sphere phi]]))
 
 ;; ## Einstein's Field Equations
 
@@ -53,7 +56,7 @@
         [::vf/vector-field
          ::vf/vector-field]))))
 
-(define-coordinates [t r theta phi] spacetime-sphere)
+(define-coordinates [t r theta phi] e/spacetime-sphere)
 
 (defn Schwarzschild-metric [c G M]
   (let [a (- 1 (* (/ 2 (square c))
