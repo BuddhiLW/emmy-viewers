@@ -32,7 +32,10 @@ jobs:
           restore-keys: ${{ runner.os }}-m2
 
       - name: Install dependencies
-        run: clojure -P -M:test:runner
+        # -Sthreads 1: tools.deps' parallel resolution races (HashMap$Node
+        # cannot be cast to HashMap$TreeNode); resolve serially and cache the
+        # classpath for the run below (same aliases, same exec mode).
+        run: clojure -Sthreads 1 -P -X:test:runner
 
       - name: Clojure tests
         run: bb test:clj

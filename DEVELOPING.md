@@ -97,22 +97,52 @@ Every encoded JSON object has exactly one key, which is one of these tags, so
 plain strings never need escaping. Map keys may be any value. A JS consumer
 sees `1` and `1.0` as the same number; the Clojure reader keeps them apart.
 
-To build ONE notebook into a self-contained static folder (same pipeline as
-the static build below, through `emmy.clerk/build!`), from a REPL started
-with the `:nextjournal/clerk` alias:
+To build ONE notebook into a static folder (same pipeline as the static build
+below, through `emmy.clerk/build!`), with the `:nextjournal/clerk` and `:cljs`
+aliases (node and npm on the PATH):
+
+```
+clojure -X:nextjournal/clerk:cljs emmy.viewer.export/export-notebook! \
+  :notebook '"dev/examples/mafs.clj"' :out-dir '"target/export-mafs"'
+```
+
+or from a REPL started with those aliases:
 
 ```clojure
 (x/export-notebook! {:notebook "dev/examples/mafs.clj"
-                     :out-dir  "public/lesson"})
-;; => {:notebook ... :out-dir "public/lesson" :index-html "public/lesson/index.html"}
+                     :out-dir  "target/export-mafs"})
+;; => {:notebook "dev/examples/mafs.clj"
+;;     :out-dir "target/export-mafs"
+;;     :index-html "target/export-mafs/index.html"}
 ```
 
-Other options go to `emmy.clerk/build!` and Clerk's `build!`, e.g.
-`:package :single-file`. By default the page loads Emmy-Viewers' published JS
-bundle from Clerk's CDN (`emmy.clerk/custom-js`), so viewing it needs network
-access; pass `:cljs-namespaces '[emmy-viewers.sci-extensions]` to compile the
-bundle locally instead (needs node). The test suite does not run
-`export-notebook!`.
+`:out-dir` then holds `index.html`, the notebook's content in `index.edn` and
+the viewer bundle in `_data/<hash>.js`. The page fetches `index.edn`, so serve
+the folder over HTTP (`bb serve --dir target/export-mafs`); opening
+`index.html` from `file://` shows nothing. The page still loads Tailwind and
+the viewers' CSS from public CDNs.
+
+By default the viewer bundle is compiled from this checkout by shadow-cljs
+(`:cljs-namespaces '[emmy.viewer.clerk-bundle]`, a few minutes on the first
+build). The prebuilt bundle at `emmy.clerk/custom-js` was built for an older
+Clerk and does not start under the Clerk pinned here (the page throws
+`TypeError: Cannot set properties of null` and nothing mounts), so it is not
+the default; `:custom-js <url>` still selects a bundle by URL, and
+`:cljs-namespaces` your own entry namespaces. Other options go to
+`emmy.clerk/build!` and Clerk's `build!`, e.g. `:package :single-file`.
+
+To check an export in headless Chromium (playwright-core, as for the raster
+e2e test): no page errors, the bundle loads, the prose renders and Mafs mounts
+its `<svg>`s:
+
+```
+EXPORT_E2E_BUILD=target/export-mafs node dev/e2e/export_render.mjs
+```
+
+`test/emmy/viewer/export_notebook_test.clj` runs `export-notebook!` on a tiny
+notebook in a temp dir as part of `clojure -X:test:runner`. It passes
+`:custom-js`, so it compiles nothing and needs no network, and asserts on the
+written files only.
 
 ### GitHub Pages
 

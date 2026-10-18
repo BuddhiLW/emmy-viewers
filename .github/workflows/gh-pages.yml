@@ -35,6 +35,12 @@ jobs:
           bb: latest
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install dependencies
+        # -Sthreads 1: tools.deps' parallel resolution races (HashMap$Node
+        # cannot be cast to HashMap$TreeNode); resolve serially and cache the
+        # classpath for `bb build-static` (same aliases, same exec mode).
+        run: clojure -Sthreads 1 -P -X:nextjournal/clerk:portal
+
       - name: Build static site
         run: bb build-static
 

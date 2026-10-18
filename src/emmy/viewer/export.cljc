@@ -353,27 +353,51 @@
 
   - `:notebook` (required): path to the notebook, `.clj`, `.cljc` or `.md`,
     relative to the working directory.
-  - `:out-dir` (required): directory to write; it holds `index.html` when the
-    build finishes.
+  - `:out-dir` (required): directory to write. When the build finishes it
+    holds `index.html`, the notebook's content in `index.edn` (the page fetches
+    it, so serve the folder over HTTP; `file://` does not work) and, unless
+    `:custom-js` is given, the viewer bundle under `_data/`.
+
+  The viewer JS: by default the bundle is COMPILED from source with
+  shadow-cljs (`:cljs-namespaces '[emmy.viewer.clerk-bundle]`), which needs
+  the `:cljs` alias next to `:nextjournal/clerk` and node/npm, and takes a few
+  minutes. The prebuilt bundle on Clerk's CDN (`emmy.clerk/custom-js`) was
+  built for an older Clerk and does not start under the Clerk this project
+  pins, so it is not the default; pass `:custom-js <url>` to load a bundle
+  from a URL, or your own `:cljs-namespaces`.
 
   Every other option goes to [[emmy.clerk/build!]] and on to Clerk's `build!`,
-  e.g. `:package :single-file` for one HTML file, `:cljs-namespaces` to compile
-  the viewer JS locally instead of loading Emmy-Viewers' published bundle from
-  Clerk's CDN, or `:git/sha`. Requires Clerk on the classpath (the
-  `:nextjournal/clerk` alias). Returns `{:notebook :out-dir :index-html}`."
+  e.g. `:package :single-file` or `:git/sha`. Returns
+  `{:notebook :out-dir :index-html}`, `:index-html` being the path of the
+  written `index.html`; throws if the build wrote none.
+
+  ```
+  clojure -X:nextjournal/clerk:cljs emmy.viewer.export/export-notebook! \\
+    :notebook '\"dev/examples/mafs.clj\"' :out-dir '\"target/mafs\"'
+  ```"
      [{:keys [notebook out-dir] :as opts}]
      (when-not (and (string? notebook) (string? out-dir))
        (throw (ex-info "export-notebook! needs :notebook and :out-dir strings."
                        {:opts opts})))
-     (when-not (.exists (java.io.File. ^String notebook))
+     (when-not (.isFile (java.io.File. ^String notebook))
        (throw (ex-info (str "Notebook not found: " notebook)
                        {:notebook notebook})))
-     (let [build! (requiring-resolve 'emmy.clerk/build!)]
+     (let [build!     (requiring-resolve 'emmy.clerk/build!)
+           index-html (java.io.File. ^String out-dir "index.html")
+           js         (if (or (:custom-js opts) (:cljs-namespaces opts))
+                        {}
+                        {:cljs-namespaces '[emmy.viewer.clerk-bundle]})]
+       ;; A stale index.html must not pass for this build's.
+       (.delete index-html)
        (build! (merge {:paths   [notebook]
                        :index   notebook
                        :browse? false}
+                      js
                       (dissoc opts :notebook :out-dir)
                       {:out-path out-dir}))
+       (when-not (.isFile index-html)
+         (throw (ex-info (str "Clerk's build wrote no " index-html)
+                         {:notebook notebook :out-dir out-dir})))
        {:notebook   notebook
         :out-dir    out-dir
-        :index-html (str (java.io.File. ^String out-dir "index.html"))})))
+        :index-html (str index-html)})))
