@@ -2,6 +2,39 @@
 
 ## [unreleased]
 
+## [0.5.0-fork.1]
+
+First release of the fork on Clojars, as `io.github.buddhilw/emmy-viewers`
+(upstream owns the `org.mentat` group):
+
+```clojure
+io.github.buddhilw/emmy-viewers {:mvn/version "0.5.0-fork.1"}
+```
+
+The jar's POM does not list Emmy: the fork depends on the Emmy fork through a
+git coordinate, which a POM cannot express. Add Emmy to your own `deps.edn`,
+using the same coordinate as this repository:
+
+```clojure
+io.github.mentat-collective/emmy
+{:git/url "https://github.com/BuddhiLW/emmy.git"
+ :git/tag "v0.33.0-fork.1"
+ :git/sha "1ed6094"}
+```
+
+- BuddhiLW/emmy-viewers#4: depend on the Emmy fork release `v0.33.0-fork.1`
+  instead of Maven `org.mentat/emmy 0.31.0`, so a project using both
+  libraries resolves one Emmy. `emmy.viewer.raster.lower/shared` inlines
+  constants and once-used values again after Emmy's new CSE pass. The
+  vendored clj-kondo config for Emmy is refreshed from the fork.
+
+- BuddhiLW/emmy-viewers#5: new `emmy.viewer.export` namespace.
+  `fragment->edn` / `edn->fragment` and `fragment->json` / `json->fragment`
+  round-trip fragments, including their viewer metadata, losslessly.
+  `register-viewer!` adds transform viewers to the export registry.
+  `export-notebook!` builds one notebook into a static HTML folder. See
+  DEVELOPING.md, "Exporting fragments and single notebooks".
+
 ## [0.4.0-fork.1]
 
 Released from the BuddhiLW/emmy-viewers fork so the changes below can be used
