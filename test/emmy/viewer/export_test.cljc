@@ -140,25 +140,28 @@
            (x/fragment->edn (ev/fragment [:div (hash-set :b :a :c)]))))))
 
 (deftest json-encoding-tests
+  ;; Ratios exist only on the JVM: a `1/2` literal is not a valid
+  ;; ClojureScript constant, so the cljs build uses a double there.
   (let [frag (ev/fragment
               (list 'reagent.core/with-let ['a (list 'reagent.core/atom 1)]
                     [:div {:k "v" "s" 'sym :d 1.0 :n nil}
-                     '(fn [x] x) #{:x} "~kw" 1/2 \c 3 2.5]))
+                     '(fn [x] x) #{:x} "~kw" #?(:clj 1/2 :cljs 0.5) \c 3 2.5]))
         s    (x/fragment->json frag)]
     (testing "explicit tags"
       (is (str/includes? s "{\"~list\":[{\"~sym\":\"reagent.core/with-let\"}"))
       (is (str/includes? s "[{\"~kw\":\"div\"},{\"~map\":"))
       (is (str/includes? s "{\"~set\":[{\"~kw\":\"x\"}]}"))
-      (is (str/includes? s "{\"~ratio\":\"1/2\"}"))
+      #?(:clj (is (str/includes? s "{\"~ratio\":\"1/2\"}")))
       (is (str/includes? s "{\"~char\":\"c\"}")))
     (testing "strings that look like tags stay strings"
-      (is (str/includes? s "\"~kw\",{\"~ratio\"")))
+      (is (str/includes? s #?(:clj  "\"~kw\",{\"~ratio\""
+                              :cljs "\"~kw\",0.5"))))
     (testing "lossless"
       (let [rt   (x/json->fragment s)
             body (nth rt 2)]
         (is (= frag rt))
         (is (same-shape? frag rt))
-        (is (= 1/2 (nth body 5)))
+        (is (= #?(:clj 1/2 :cljs 0.5) (nth body 5)))
         (is (= \c (nth body 6)))
         (is (double? (get-in body [1 :d])))
         (is (= 1.0 (get-in body [1 :d])))
