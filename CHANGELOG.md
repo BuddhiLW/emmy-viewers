@@ -2,6 +2,22 @@
 
 ## [unreleased]
 
+## [0.5.1-fork.1]
+
+- Fix `Invalid arity: 8` thrown by every MathBox scene with tick labels.
+  MathBox's `Format` primitive calls its `:expr` as `expr(x, y, z, w, i, j, k,
+  l)`, but `emmy.viewer.plot/format-number`, the default `:label-fn` of
+  `emmy.mathbox.plot/labeled-axis` and of the axes of `scene`, had only 1- and
+  2-argument bodies. `format-number` and `label-pi` now ignore a third and later
+  arguments (1- and 2-argument output is unchanged), and `LabeledAxis` calls
+  `:label-fn` with the tick value only, so a custom label function keeps the
+  documented `(fn [x] ...)` shape. Mafs (`labelMaker(x)`) and JSXGraph receive
+  no formatter from Emmy-Viewers and were not affected.
+
+- `dev/e2e/export_render.mjs` checks MathBox exports with
+  `EXPORT_E2E_KIND=mathbox` and prints the page-error count;
+  `dev/e2e/mathbox_ticks.clj` is the smallest notebook with tick labels.
+
 ## [0.5.0-fork.1]
 
 First release of the fork on Clojars, as `io.github.buddhilw/emmy-viewers`

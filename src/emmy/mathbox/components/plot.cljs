@@ -164,9 +164,13 @@
      [mb/Ticks {:width width}]
      (when labels?
        [:<>
+        ;; MathBox calls a Format `:expr` as `(expr x y z w i j k l)`.
+        ;; `label-fn` is documented as `(fn [x] ...)`; a fixed-arity or
+        ;; multi-arity fn would throw (or misread `y` as a precision) on the
+        ;; extra arguments, so hand it the tick value alone.
         [mb/Format
          {:live true
-          :expr label-fn}]
+          :expr (fn [x & _] (label-fn x))}]
         [mb/Label
          {:color color
           :background background

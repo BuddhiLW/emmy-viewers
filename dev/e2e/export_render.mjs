@@ -3,7 +3,8 @@
 // Serves the export folder over HTTP (the page fetches its content from
 // index.edn, so file:// does not work), opens it in headless Chromium and
 // checks that the page raises no errors, loads the viewer bundle and mounts
-// at least one Mafs <svg>.
+// at least one Mafs <svg> (or, with EXPORT_E2E_KIND=mathbox, one MathBox
+// <canvas>).
 //
 // Export first, then run:
 //
@@ -11,8 +12,16 @@
 //     :notebook '"dev/examples/mafs.clj"' :out-dir '"target/export-mafs"'
 //   node dev/e2e/export_render.mjs
 //
-// EXPORT_E2E_BUILD sets the folder (default target/export-mafs); CHROMIUM
-// the browser binary. Unlike raster_render.mjs, remote scripts are allowed:
+// MathBox: dev/e2e/mathbox_ticks.clj is the smallest notebook with tick labels
+// (MathBox calls the tick formatter with 8 arguments, see CHANGELOG 0.5.1-fork.1):
+//
+//   clojure -X:nextjournal/clerk:cljs emmy.viewer.export/export-notebook! \
+//     :notebook '"dev/e2e/mathbox_ticks.clj"' :out-dir '"target/export-mathbox"'
+//   EXPORT_E2E_BUILD=target/export-mathbox EXPORT_E2E_KIND=mathbox \
+//     node dev/e2e/export_render.mjs
+//
+// EXPORT_E2E_BUILD sets the folder (default target/export-mafs);
+// EXPORT_E2E_KIND is mafs (default) or mathbox; CHROMIUM the browser binary. Unlike raster_render.mjs, remote scripts are allowed:
 // by default the export loads Emmy-Viewers' published bundle from Clerk's CDN.
 
 import { chromium } from "playwright-core";
@@ -23,6 +32,10 @@ import { join, extname, resolve } from "node:path";
 import { homedir } from "node:os";
 
 const ROOT = resolve(process.env.EXPORT_E2E_BUILD ?? "target/export-mafs");
+const KIND = process.env.EXPORT_E2E_KIND ?? "mafs";
+const MOUNT = { mafs: [".MafsView svg", "Mafs <svg>"],
+                mathbox: ["canvas", "MathBox <canvas>"] }[KIND];
+if (!MOUNT) throw new Error(`unknown EXPORT_E2E_KIND ${KIND}`);
 
 function chromiumPath() {
   if (process.env.CHROMIUM) return process.env.CHROMIUM;
@@ -80,8 +93,8 @@ async function main() {
     page.on("response", (r) => { if (r.status() >= 400) failed.push(`${r.status()} ${r.url()}`); });
 
     await page.goto(`${origin}/`, { waitUntil: "load" });
-    await page.waitForFunction(() => document.querySelectorAll(".MafsView svg").length > 0,
-                               null, { timeout: Number(process.env.EXPORT_E2E_TIMEOUT ?? 60000) }).catch(() => {});
+    await page.waitForFunction((sel) => document.querySelectorAll(sel).length > 0,
+                               MOUNT[0], { timeout: Number(process.env.EXPORT_E2E_TIMEOUT ?? 60000) }).catch(() => {});
     await page.waitForTimeout(2000);
     await page.screenshot({ path: join(ROOT, "screenshot.png"), fullPage: true });
 
@@ -91,9 +104,11 @@ async function main() {
     check(!!viewer, `viewer bundle requested (${viewer ?? "none"})`);
     const heading = await page.evaluate(() => document.querySelector("h1, h2")?.textContent ?? null);
     check(heading != null && heading.length > 0, `notebook prose rendered (first heading: ${JSON.stringify(heading)})`);
-    const svgs = await page.evaluate(() => document.querySelectorAll(".MafsView svg").length);
-    check(svgs > 0, `${svgs} Mafs <svg> mounted`);
-    check(errors.length === 0, `no page errors${errors.length ? ": " + errors.join(" | ") : ""}`);
+    const mounted = await page.evaluate((sel) => document.querySelectorAll(sel).length, MOUNT[0]);
+    check(mounted > 0, `${mounted} ${MOUNT[1]} mounted`);
+    const distinct = [...new Set(errors)];
+    console.log(`     page errors: ${errors.length} (${distinct.length} distinct)`);
+    check(errors.length === 0, `no page errors${errors.length ? ": " + distinct.slice(0, 5).join(" | ") : ""}`);
     if (consoleErrors.length) console.log(`     console errors (not page errors): ${consoleErrors.slice(0, 5).join(" | ")}`);
     if (failed.length) console.log(`     failed requests: ${failed.slice(0, 5).join(" | ")}`);
   } finally {
