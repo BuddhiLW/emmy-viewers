@@ -69,13 +69,13 @@
 ;; Note that the function inside of `ev/with-params` takes `shift` and returns
 ;; another function, built using Emmy's "function algebra".
 ;;
-;; The inner function `(((cube D) tanh) (- identity shift))` is equivalent
-;; to `(fn [x] (((cube D) tanh) (- x shift)))`.
+;; The inner function `(compose ((cube D) tanh) (- identity shift))` is
+;; equivalent to `(fn [x] (((cube D) tanh) (- x shift)))`.
 
 (ev/with-let [!phase [0 0]]
   (let [shifted (ev/with-params {:atom !phase :params [0]}
                   (fn [shift]
-                    (((cube D) tanh) (- identity shift))))]
+                    (compose ((cube D) tanh) (- identity shift))))]
     (mafs/mafs
      (mafs/cartesian)
      (mafs/of-x shifted)

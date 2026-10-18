@@ -27,7 +27,7 @@
     (ev/with-let [!phase [0 0]]
       (let [shifted (ev/with-params {:atom !phase :params [0]}
                       (fn [shift]
-                        (((cube D) tanh) (- identity shift))))]
+                        (compose ((cube D) tanh) (- identity shift))))]
         (mafs/mafs
          (mafs/cartesian)
          (mafs/of-x shifted)

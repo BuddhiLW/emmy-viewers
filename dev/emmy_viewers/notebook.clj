@@ -72,7 +72,7 @@
 (emmy.viewer/with-let [!phase [0 0]]
   (let [shifted (emmy.viewer/with-params {:atom !phase :params [0]}
                   (fn [shift]
-                    (((cube D) tanh) (- identity shift))))]
+                    (compose ((cube D) tanh) (- identity shift))))]
     (emmy.mafs/mafs
      {:height 400}
      (emmy.mafs/cartesian)
