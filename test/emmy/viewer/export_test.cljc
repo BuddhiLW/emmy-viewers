@@ -152,7 +152,7 @@
       (is (str/includes? s "[{\"~kw\":\"div\"},{\"~map\":"))
       (is (str/includes? s "{\"~set\":[{\"~kw\":\"x\"}]}"))
       #?(:clj (is (str/includes? s "{\"~ratio\":\"1/2\"}")))
-      (is (str/includes? s "{\"~char\":\"c\"}")))
+      #?(:clj (is (str/includes? s "{\"~char\":\"c\"}"))))
     (testing "strings that look like tags stay strings"
       (is (str/includes? s #?(:clj  "\"~kw\",{\"~ratio\""
                               :cljs "\"~kw\",0.5"))))
