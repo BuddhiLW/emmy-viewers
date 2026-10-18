@@ -107,17 +107,31 @@
   "`outputs` with the subexpressions they share bound once, by Emmy's CSE pass
   over all outputs together: `{:bindings [[sym expr] ...] :outputs [expr ...]}`.
   Constant bindings are substituted back, so a literal exponent stays a
-  literal (see `power`)."
+  literal (see `power`).
+
+  Emmy's CSE binds every node of the DAG, literals and single-use nodes
+  included; a binding used at most once is inlined back, so only genuinely
+  shared subexpressions stay bound."
   [outputs]
   (cse/extract-common-subexpressions
    (list* 'clojure.core/doto 'out
           (map-indexed (fn [i o] (list 'clojure.core/aset i o)) outputs))
    (fn [[_doto _out & asets] pairs]
-     (let [consts (into {} (filter (comp constant? second)) pairs)
-           subst  #(walk/postwalk-replace consts %)]
-       {:bindings (vec (for [[sym v] pairs :when (not (consts sym))]
-                         [sym (subst v)]))
-        :outputs  (mapv (fn [[_aset _i e]] (subst e)) asets)}))
+     (let [outs   (map (fn [[_aset _i e]] e) asets)
+           syms   (set (map first pairs))
+           uses   (frequencies
+                   (filter syms (mapcat #(tree-seq coll? seq %)
+                                        (concat (map second pairs) outs))))
+           [bindings inline]
+           (reduce (fn [[bs inline] [sym v]]
+                     (let [v (walk/postwalk-replace inline v)]
+                       (if (or (constant? v) (<= (uses sym 0) 1))
+                         [bs (assoc inline sym v)]
+                         [(conj bs [sym v]) inline])))
+                   [[] {}]
+                   pairs)]
+       {:bindings bindings
+        :outputs  (mapv #(walk/postwalk-replace inline %) outs)}))
    {}))
 
 (defn kernel-form

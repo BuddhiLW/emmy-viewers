@@ -1,7 +1,11 @@
 {:paths ["src" "resources"]
  :deps
  {org.clojure/data.json {:mvn/version "2.4.0"}
-  org.mentat/emmy {:mvn/version "0.31.0"}
+  ;; emmy fork release carrying upstream PRs #197-#200 (same coordinate as
+  ;; desargues, so a downstream project resolves ONE emmy); back to upstream
+  ;; org.mentat/emmy once merged.
+  io.github.mentat-collective/emmy {:git/url "https://github.com/BuddhiLW/emmy.git"
+                                    :git/tag "v0.33.0-fork.1" :git/sha "1ed6094"}
   org.mentat/jsxgraph.cljs {:mvn/version "0.2.1"}
   org.mentat/leva.cljs {:mvn/version "0.3.0"}
   org.mentat/mathbox.cljs {:mvn/version "0.2.2"}
