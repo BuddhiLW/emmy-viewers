@@ -16,8 +16,9 @@
 
 ;; ## Variables
 
-(def lib 'org.mentat/emmy-viewers)
-(def version "0.4.0-fork.1")
+;; Published to Clojars under the fork's own group: upstream owns org.mentat.
+(def lib 'io.github.buddhilw/emmy-viewers)
+(def version "0.5.0-fork.1")
 (def pom-deps
   {'org.babashka/sci
    {:mvn/version "0.7.39"
@@ -72,9 +73,9 @@
                   :version version
                   :scm
                   {:tag (str "v" version)
-                   :connection "scm:git:git://github.com/mentat-collective/emmy-viewers.git"
-                   :developConnection "scm:git:ssh://git@github.com/mentat-collective/emmy-viewers.git"
-                   :url "https://github.com/mentat-collective/emmy-viewers"}
+                   :connection "scm:git:git://github.com/BuddhiLW/emmy-viewers.git"
+                   :developConnection "scm:git:ssh://git@github.com/BuddhiLW/emmy-viewers.git"
+                   :url "https://github.com/BuddhiLW/emmy-viewers"}
                   :basis basis
                   :src-pom "template/pom.xml"
                   :src-dirs ["src"]
