@@ -18,7 +18,7 @@
 
 ;; Published to Clojars under the fork's own group: upstream owns org.mentat.
 (def lib 'io.github.buddhilw/emmy-viewers)
-(def version "0.5.0-fork.1")
+(def version "0.5.1-fork.1")
 (def pom-deps
   {'org.babashka/sci
    {:mvn/version "0.7.39"
